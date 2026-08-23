@@ -43,42 +43,48 @@ If this document conflicts with `DESIGN_CONTRACT.md`, the design contract wins.
 
 ## 3. Architectural style
 
-VascuQuest uses a **layered ports-and-adapters architecture** implemented with ordinary Python modules, typed interfaces, and an explicit composition root.
+VascuQuest uses a **layered ports-and-adapters architecture** implemented with ordinary Python modules, typed interfaces, and one explicit composition root.
 
 The term is used narrowly. It means:
 
 - the scientific domain defines meanings and invariants;
-- application services coordinate scientific use cases;
 - ports define contracts for capabilities supplied by backends or extensions;
-- adapters implement those contracts for PWDB, Zenodo/local files, the CLI, and third-party plugins;
-- one composition root wires concrete implementations together at runtime.
+- application services coordinate scientific use cases against those contracts;
+- adapters implement the contracts for PWDB, artifact sources, exporters, and third-party plugins;
+- the interface layer exposes the application through Python and the CLI;
+- one composition root creates and wires the concrete implementations at runtime.
 
 VascuQuest will **not** use a dependency-injection framework. Constructor/function injection and explicit object creation are sufficient.
 
 ### Dependency direction
 
 ```text
-                 User interfaces
-              Python API      CLI
-                   \          /
-                    \        /
-                 Application layer
-                        |
-                        v
-                 Scientific domain
-                        ^
-                        |
-                  Public ports
-                        ^
-                        |
-       +----------------+----------------+
-       |                |                |
-  PWDB backend      Plugin adapters   I/O adapters
-  acquisition       third-party       local/remote
-  schema maps       extensions        persistence
+Python API / CLI
+       |
+       v
+composition root
+       |
+       v
+application services ------> ports ------> domain
+       |                       ^             ^
+       |                       |             |
+       +-----------------------+-------------+
+                               |
+                         concrete adapters
+                 (PWDB, artifact I/O, plugins,
+                    exporters, persistence)
 ```
 
-The important rule is not the drawing; it is the dependency direction:
+The arrows indicate imports/dependencies, not runtime data flow.
+
+The explicit import rules are:
+
+1. `domain` depends only on the Python standard library and explicitly approved foundational scientific types; it does **not** import `ports`, `services`, concrete adapters, or interfaces.
+2. `ports` may depend on stable domain types.
+3. `services` may depend on `domain` and `ports`.
+4. concrete adapters may depend on `domain` and `ports`; they must not be required by the domain.
+5. the composition root may depend on services and concrete adapters because its sole purpose is wiring.
+6. the Python API and CLI enter through the composition/application boundary rather than reading PWDB files directly.
 
 > **Scientific domain code must not import concrete data backends, Zenodo clients, CLI frameworks, plotting libraries, or plugin implementations.**
 
@@ -174,6 +180,12 @@ The interface layer may format results but must not contain unique scientific al
 
 The CLI must call application services or the public facade rather than independently accessing PWDB files.
 
+### 4.6 Composition root
+
+The composition root is a small wiring module. It selects the configured dataset backend, artifact source, schema provider, plugin registry, and application services and constructs the user-facing session/facade.
+
+It contains no scientific algorithms and no source parsing. Its existence prevents service/backend construction logic from being duplicated across the Python API and CLI.
+
 ---
 
 ## 5. Proposed package topology
@@ -195,6 +207,7 @@ src/vascuquest/
     plugins/              # entry-point discovery and compatibility checks
     exporters/            # built-in result serializers
     cli/                  # command-line adapter only
+    bootstrap.py          # composition root; wiring only
     errors.py             # stable public error hierarchy
     _version.py           # package version access
 ```
@@ -205,10 +218,11 @@ Rules:
 
 1. No `utils.py` dumping ground is permitted. Shared code must belong to a named responsibility.
 2. `backends/pwdb3275625` may know the historical source layout; `domain`, `ports`, and generic `services` may not.
-3. `cli` may import the public API/application layer, but scientific modules may not import `cli`.
+3. `cli` may enter through `bootstrap`/application services, but scientific modules may not import `cli`.
 4. `plugins` discovers extensions; it does not implement their science.
 5. `schema` stores/loads canonical semantic definitions; source-specific field mappings may live with the relevant backend when that keeps coupling explicit.
-6. New top-level packages require a clear architectural responsibility rather than convenience alone.
+6. `bootstrap.py` wires concrete implementations and must not accumulate application or scientific logic.
+7. New top-level packages require a clear architectural responsibility rather than convenience alone.
 
 ---
 
@@ -643,16 +657,18 @@ These are not omissions. They are controlled decisions assigned to later contrac
 
 The following rules can be checked mechanically or during review and must hold throughout implementation.
 
-1. `domain` imports no `backends`, `data`, `cli`, or concrete plugin modules.
-2. `ports` imports no concrete adapters.
+1. `domain` imports no `ports`, `services`, `backends`, `data`, `cli`, or concrete plugin modules.
+2. `ports` may import domain types but imports no concrete adapters.
 3. `services` depends on domain/ports, not PWDB-specific file layouts.
-4. `backends/pwdb3275625` is the only built-in area allowed to encode dataset-specific historical source structure, apart from declarative manifest/schema resources.
-5. `cli` contains no unique scientific calculation.
-6. all scientific results capable of leaving the process carry evidence/provenance semantics when materially applicable;
-7. source files are never modified in place;
-8. plugin code is discovered from installed distributions, not arbitrary paths;
-9. a normal metadata/query operation must not trigger an unconditional full-dataset download;
-10. storage technology does not leak into the stable public scientific API unless it is deliberately exposed as an interoperability object.
+4. concrete adapters implement ports and do not become dependencies of the domain.
+5. `backends/pwdb3275625` is the only built-in area allowed to encode dataset-specific historical source structure, apart from declarative manifest/schema resources.
+6. `bootstrap.py` may import services and concrete adapters for wiring but contains no scientific or parsing logic.
+7. `cli` contains no unique scientific calculation.
+8. all scientific results capable of leaving the process carry evidence/provenance semantics when materially applicable;
+9. source files are never modified in place;
+10. plugin code is discovered from installed distributions, not arbitrary paths;
+11. a normal metadata/query operation must not trigger an unconditional full-dataset download;
+12. storage technology does not leak into the stable public scientific API unless it is deliberately exposed as an interoperability object.
 
 ---
 
@@ -678,7 +694,7 @@ An installed third-party operator declares required inputs, assumptions, outputs
 
 ### Scenario E — discovery method
 
-A researcher defines a cohort and invokes a discovery method. The method receives canonical inputs rather than raw PWDB filenames, and its `INFERRED` output retains cohort definition, method parameters, and provenance.
+A researcher defines a cohort and invokes a discovery method. The method receives canonical inputs rather than raw PWDB filenames. The discovery result records the method, cohort, parameters, and provenance; scientific quantities within or produced by that result retain or receive the evidence class appropriate to the operation. Statistical estimates are normally `INFERRED`, while deterministic selections or summaries must not be mislabeled merely because they were produced by the discovery subsystem.
 
 ### Scenario F — reproducibility
 
