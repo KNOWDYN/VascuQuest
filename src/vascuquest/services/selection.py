@@ -57,6 +57,9 @@ class SelectionService:
         inclusion_filters: list[str] = []
         for quantity in sorted(normalized_where):
             expected = normalized_where[quantity]
+            inclusion_filters.append(f"{quantity}={expected!r}")
+            if not selected:
+                continue
             current = Cohort(
                 dataset_identity=identity,
                 canonical_subject_ids=selected,
@@ -84,7 +87,6 @@ class SelectionService:
                 for subject_id, value in zip(selected, values, strict=True)
                 if value is not None and value == expected
             )
-            inclusion_filters.append(f"{quantity}={expected!r}")
 
         return Cohort(
             dataset_identity=identity,
