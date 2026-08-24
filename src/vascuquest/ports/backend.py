@@ -1,7 +1,7 @@
 """Dataset-backend port and storage-independent scientific read requests.
 
 The backend port translates a concrete virtual-population source into canonical
-VascuQuest domain objects.  It deliberately contains no source filenames,
+VascuQuest domain objects. It deliberately contains no source filenames,
 reader-library types, acquisition logic, or dataset-specific equations.
 """
 
@@ -12,12 +12,18 @@ from typing import Protocol, TypeAlias, runtime_checkable
 
 from vascuquest.domain.cohort import Cohort
 from vascuquest.domain.identity import DatasetIdentity, SubjectKey
-from vascuquest.domain.location import VascularLocation
+from vascuquest.domain.location import (
+    MeasurementSite,
+    PathPosition,
+    SegmentLocation,
+    VascularLocation,
+)
 from vascuquest.domain.result import ScientificResult, Waveform
 from vascuquest.domain.subject import VirtualSubject
 
 
 CapabilitySet: TypeAlias = frozenset[str]
+_LOCATION_TYPES = (SegmentLocation, MeasurementSite, PathPosition)
 
 
 def _required_text(value: str, field_name: str) -> None:
@@ -27,6 +33,11 @@ def _required_text(value: str, field_name: str) -> None:
         raise ValueError(f"{field_name} must not be empty")
     if value != value.strip():
         raise ValueError(f"{field_name} must not contain leading or trailing whitespace")
+
+
+def _validate_location(value: object | None, field_name: str) -> None:
+    if value is not None and not isinstance(value, _LOCATION_TYPES):
+        raise TypeError(f"{field_name} must be a supported VascularLocation")
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +55,7 @@ class QuantityRequest:
             raise TypeError("subject must be a SubjectKey")
         if self.cohort is not None and not isinstance(self.cohort, Cohort):
             raise TypeError("cohort must be a Cohort")
+        _validate_location(self.location, "location")
         if self.subject is not None and self.cohort is not None:
             if self.subject.dataset_identity != self.cohort.dataset_identity:
                 raise ValueError("subject and cohort must belong to the same dataset")
@@ -63,6 +75,7 @@ class WaveformRequest:
         _required_text(self.signal, "signal")
         if not isinstance(self.subject, SubjectKey):
             raise TypeError("subject must be a SubjectKey")
+        _validate_location(self.location, "location")
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,13 +88,14 @@ class GeometryRequest:
     def __post_init__(self) -> None:
         if self.subject is not None and not isinstance(self.subject, SubjectKey):
             raise TypeError("subject must be a SubjectKey")
+        _validate_location(self.location, "location")
 
 
 @runtime_checkable
 class DatasetBackend(Protocol):
     """Structural port implemented by one canonical dataset backend.
 
-    ``descriptor`` is intentionally typed as ``object`` here.  The concrete
+    ``descriptor`` is intentionally typed as ``object`` here. The concrete
     plugin layer validates that it is a VascuQuest ``ComponentDescriptor``;
     keeping that implementation type out of this module preserves the approved
     ports-to-domain dependency direction.
