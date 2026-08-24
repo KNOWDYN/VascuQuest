@@ -16,9 +16,11 @@ from vascuquest.services import (
     DatasetStatus,
     ExecutionService,
     ExportingService,
+    QuantitySubjects,
     ReproductionService,
     RetrievalService,
     SelectionService,
+    SubjectSelector,
 )
 
 
@@ -107,7 +109,7 @@ class DatasetSession:
         self,
         quantity: str,
         *,
-        subjects: object = None,
+        subjects: QuantitySubjects = None,
         location: VascularLocation | None = None,
     ) -> ScientificResult:
         return self._retrieval.get(quantity, subjects=subjects, location=location)
@@ -116,7 +118,7 @@ class DatasetSession:
         self,
         signal: str,
         *,
-        subject: object,
+        subject: SubjectSelector,
         location: VascularLocation,
     ) -> Waveform:
         return self._retrieval.waveform(signal, subject=subject, location=location)
@@ -124,7 +126,7 @@ class DatasetSession:
     def geometry(
         self,
         *,
-        subject: object,
+        subject: SubjectSelector,
         location: VascularLocation | None = None,
     ) -> ScientificResult:
         return self._retrieval.geometry(subject=subject, location=location)
@@ -134,7 +136,7 @@ class DatasetSession:
         method: str,
         *,
         inputs: Mapping[str, ScientificResult] | None = None,
-        subjects: object = None,
+        subjects: QuantitySubjects = None,
         location: VascularLocation | None = None,
         parameters: Mapping[str, object] | None = None,
     ) -> ScientificResult:
@@ -151,7 +153,7 @@ class DatasetSession:
         operator: str,
         *,
         inputs: Mapping[str, ScientificResult] | None = None,
-        subjects: object = None,
+        subjects: QuantitySubjects = None,
         location: VascularLocation | None = None,
         parameters: Mapping[str, object] | None = None,
     ) -> ScientificResult:
