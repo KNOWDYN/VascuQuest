@@ -41,10 +41,14 @@ SOURCE_SCOPE_ARTIFACT_IDS = MappingProxyType(
     }
 )
 
+# Capability claims intentionally name only source classes that are exposed
+# through the current canonical retrieval surface. The model-variations
+# artifact is mapped above for future schema expansion, but is not advertised
+# until its upper-case export header and canonical quantity semantics are
+# implemented and tested explicitly.
 BATCH6_CAPABILITIES = frozenset(
     {
         "subject_model_configuration",
-        "model_variations",
         "haemodynamic_parameters",
         "pulse_wave_indices",
         "onset_times",
