@@ -16,8 +16,8 @@ The test strategy must nevertheless remain practical for ordinary development.
 
 V1 therefore uses four validation tiers:
 
-1. **Fast CI** — deterministic unit, domain, contract, CLI, and compact-fixture tests suitable for every change.
-2. **Adapter/scientific fixture validation** — representative source-format and cross-representation tests using compact retained fixtures.
+1. **Fast CI** — deterministic unit, domain, contract, CLI, and synthetic/generated-format fixture tests suitable for every change.
+2. **Canonical fixture validation** — representative canonical excerpts and cross-representation scientific checks retained separately from parser-mechanics fixtures.
 3. **Empirical ingestion spike** — real-source validation required before production large-file backend/storage choices are frozen.
 4. **Full-dataset release validation** — explicit validation against the canonical dataset before a release is declared fully validated for PWDB `3275625`.
 
@@ -61,24 +61,28 @@ Must include:
 - plugin registry/protocol conformance;
 - API behavior using fake/minimal backends;
 - CLI parsing/output/exit-code tests;
-- compact source-adapter fixture tests;
+- source-adapter mechanics tests using synthetic/generated fixtures;
 - import-boundary checks where practical.
 
 Tier 1 must be small enough that developers can run it repeatedly without access to Zenodo or the full dataset.
 
-### Tier 2 — Adapter/scientific fixture validation
+Tier 1 proves code and parser mechanics; it does not by itself prove fidelity to the real PWDB scientific content.
 
-Runs in CI when fixtures are available and during release preparation.
+### Tier 2 — Canonical fixture validation
 
-Must include representative retained fixtures for:
+Runs when retained canonical excerpts are available and during release preparation.
+
+Must include representative canonical excerpts for the source classes needed by v1, where lawful and practical, including as appropriate:
 
 - CSV source tables;
 - common-site waveform representation(s);
 - geometry representation;
 - MATLAB structures used by the v1 backend;
-- cross-representation overlap where a compact canonical fixture can be retained legally and faithfully.
+- cross-representation overlap.
 
-Tier 2 verifies source parsing and scientific mapping, not merely file readability.
+Tier 2 verifies source-to-canonical scientific mapping against known real-source excerpts rather than generated parser fixtures.
+
+Tier 2 may run in normal CI when its retained excerpts remain small; it remains conceptually distinct from Tier 1 so generated parser data are never mistaken for evidence of PWDB source fidelity.
 
 ### Tier 3 — Empirical ingestion spike
 
@@ -1013,7 +1017,8 @@ A VascuQuest release candidate is acceptable only when all applicable gates pass
 
 ### Data-backend gate
 
-- compact adapter fixtures pass;
+- synthetic/generated adapter mechanics tests pass;
+- applicable canonical-excerpt fixture tests pass;
 - ingestion spike has approved the production strategy;
 - full-source validation required for the claimed release scope passes.
 
@@ -1115,23 +1120,24 @@ The following must remain true throughout the test suite and implementation.
 1. Fast CI does not require the full canonical dataset.
 2. Full canonical artifacts remain external to normal repository tests.
 3. Test fixtures are classified as synthetic, generated, canonical excerpt, or full canonical source.
-4. Exact scientific identities use exact assertions.
-5. Approximate numerical tolerances are justified per method/representation.
-6. No universal scientific tolerance exists.
-7. Source parsing and scientific transformation tests remain distinguishable.
-8. Cross-representation validation compares canonical scientific meaning, not parser internals.
-9. Evidence class is tested according to operation semantics.
-10. Provenance completeness is directly tested.
-11. CLI/API parity is tested for each stable scientific operation.
-12. Plugin conformance does not imply scientific validation.
-13. Operator mathematics remain owned by the operator's scientific validation suite.
-14. The core does not invent new haemodynamic equations as test invariants.
-15. The `flow_rate = flow_velocity * luminal_area` reconstruction is tested only in validated applicable contexts and remains `RECONSTRUCTED`.
-16. Upstream source-unit defects remain traceable and are not repaired by source mutation.
-17. Ingestion-spike evidence is required before production large-path storage/access strategy is accepted.
-18. Full-dataset release validation is tied to the exact release candidate/code revision.
-19. Expected failures have stable Python exception/CLI exit-code behavior.
-20. Regression tests are added for confirmed recurring defects where feasible.
+4. Tier 1 generated/synthetic parser tests do not count as Tier 2 real-source scientific fidelity evidence.
+5. Exact scientific identities use exact assertions.
+6. Approximate numerical tolerances are justified per method/representation.
+7. No universal scientific tolerance exists.
+8. Source parsing and scientific transformation tests remain distinguishable.
+9. Cross-representation validation compares canonical scientific meaning, not parser internals.
+10. Evidence class is tested according to operation semantics.
+11. Provenance completeness is directly tested.
+12. CLI/API parity is tested for each stable scientific operation.
+13. Plugin conformance does not imply scientific validation.
+14. Operator mathematics remain owned by the operator's scientific validation suite.
+15. The core does not invent new haemodynamic equations as test invariants.
+16. The `flow_rate = flow_velocity * luminal_area` reconstruction is tested only in validated applicable contexts and remains `RECONSTRUCTED`.
+17. Upstream source-unit defects remain traceable and are not repaired by source mutation.
+18. Ingestion-spike evidence is required before production large-path storage/access strategy is accepted.
+19. Full-dataset release validation is tied to the exact release candidate/code revision.
+20. Expected failures have stable Python exception/CLI exit-code behavior.
+21. Regression tests are added for confirmed recurring defects where feasible.
 
 ---
 
@@ -1141,45 +1147,51 @@ The following must remain true throughout the test suite and implementation.
 
 A clean checkout runs the default test suite with no PWDB dataset present and no network access.
 
-Expected: all domain, contract, CLI, plugin, serialization, and compact-fixture tests execute successfully.
+Expected: all domain, contract, CLI, plugin, serialization, and synthetic/generated adapter-mechanics tests execute successfully.
 
-### B. Corrupted source artifact
+### B. Canonical fixture validation
+
+A retained canonical excerpt is exercised through its source adapter and canonical schema mapping.
+
+Expected: real-source field, unit, subject/location identity, and expected scientific values/metadata are preserved according to the fixture provenance.
+
+### C. Corrupted source artifact
 
 A controlled fixture has an incorrect checksum.
 
 Expected: integrity validation fails; the artifact is never promoted/used as canonical source; API and CLI expose the correct failure class/code.
 
-### C. Cross-representation waveform
+### D. Cross-representation waveform
 
 A canonical excerpt exists in two validated source representations.
 
 Expected: subject/signal/site/unit metadata agree and numerical comparison uses a documented representation-specific tolerance.
 
-### D. Evidence classification
+### E. Evidence classification
 
 A source waveform is passed to a registered deterministic derivation and separately to a research operator.
 
 Expected: original waveform remains `SOURCE`; derivation output gets its declared class; operator output is normally `MODELLED`; provenance links remain distinct.
 
-### E. CLI/API parity
+### F. CLI/API parity
 
 The same subject selection and quantity retrieval are performed through Python and the CLI.
 
 Expected: same canonical selection/value/unit/evidence semantics and equivalent provenance; only rendering differs.
 
-### F. Plugin protocol mismatch
+### G. Plugin protocol mismatch
 
 A test plugin declares protocol major `2` against v1 major `1`.
 
 Expected: rejection before scientific execution and no effect on unrelated core workflows.
 
-### G. Real large-path spike
+### H. Real large-path spike
 
 A verified real path MAT artifact is opened and one bounded subject/path/signal slice is requested.
 
 Expected: the measured result establishes whether selective access is genuinely bounded and informs the allowed production strategy; no assumption is made beforehand.
 
-### H. Release validation
+### I. Release validation
 
 The release candidate is run against the claimed full canonical dataset scope.
 
@@ -1194,6 +1206,7 @@ Expected: manifest/integrity/subject/schema/representative waveform/geometry/pat
 ### Simplicity
 
 - Are there only four meaningful validation tiers?
+- Is the Tier 1/Tier 2 boundary explicit rather than duplicated?
 - Can ordinary CI run without external dataset/network dependence?
 - Is there no requirement for a heavyweight test/simulation framework?
 - Are markers, fixtures, and platform matrices kept small?
@@ -1206,7 +1219,8 @@ Expected: manifest/integrity/subject/schema/representative waveform/geometry/pat
 
 ### Feasibility
 
-- Can fast tests use compact fixtures/fakes?
+- Can fast tests use compact synthetic/generated fixtures and fakes?
+- Can real-source canonical excerpts remain small and independently traceable?
 - Can large-source tests remain separate?
 - Can the platform matrix be executed with normal GitHub-hosted/local CI runners?
 - Are performance requirements evidence-based rather than invented?
@@ -1243,7 +1257,7 @@ Once this contract passes audit:
 
 - the v1 testing/validation architecture is frozen;
 - tolerance policy is frozen as evidence-derived rather than global;
-- fast CI versus ingestion-spike versus full-release validation responsibilities are fixed;
+- fast CI versus canonical-fixture validation versus ingestion-spike versus full-release validation responsibilities are fixed;
 - the only remaining pre-implementation planning document is `BUILD_PLAN.md`.
 
 The next contract is `BUILD_PLAN.md`.
