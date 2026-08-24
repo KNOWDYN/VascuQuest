@@ -116,6 +116,28 @@ def test_offline_mode_never_invokes_network_when_artifact_is_missing(tmp_path: P
     assert calls == []
 
 
+def test_corrupted_managed_cache_is_removed_and_checksum_failure_is_reported(tmp_path: Path) -> None:
+    payload = b"canonical-download"
+    artifact = _artifact(payload)
+
+    def forbidden_opener(url: str):
+        raise AssertionError(f"network must not be used while offline: {url}")
+
+    acquirer, paths, _ = _acquirer(tmp_path, artifact, forbidden_opener)
+    cached = paths.source_artifact(artifact.filename)
+    corrupted = b"x" * len(payload)
+    cached.write_bytes(corrupted)
+    observed = hashlib.md5(corrupted).hexdigest()
+
+    with pytest.raises(IntegrityError) as exc_info:
+        acquirer.acquire(artifact.artifact_id, offline=True)
+
+    message = str(exc_info.value)
+    assert artifact.checksum_value in message
+    assert observed in message
+    assert not cached.exists()
+
+
 def test_successful_network_acquisition_streams_verifies_and_atomically_promotes(tmp_path: Path) -> None:
     payload = b"canonical-download"
     artifact = _artifact(payload)
