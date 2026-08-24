@@ -21,8 +21,8 @@ from vascuquest.plugins.descriptor import (
 )
 from vascuquest.plugins.registry import PluginRegistry
 from vascuquest.ports.backend import GeometryRequest, QuantityRequest, WaveformRequest
-from vascuquest.provenance import ProvenanceRecord
-from vascuquest.schema import load_canonical_schema
+from vascuquest.provenance import ProvenanceRecord, SourceArtifactReference
+from vascuquest.schema import load_canonical_schema, load_manifest
 
 
 class FakeCoreBackend:
@@ -173,11 +173,19 @@ def test_core_session_routes_subject_selection_retrieval_and_source_reproduction
     geometry = session.geometry(subject="1")
     assert geometry.quantity.canonical_name == "vascular_geometry"
 
+    artifact = load_manifest().artifact("model_configurations")
     provenance = ProvenanceRecord(
         record_id="source-age-1",
         dataset_identity=session.identity,
         schema_version=session.identity.schema_version,
         evidence=vq.EvidenceClass.SOURCE,
+        source_artifacts=(
+            SourceArtifactReference(
+                artifact_id=artifact.artifact_id,
+                checksum_algorithm=artifact.checksum_algorithm,
+                checksum_value=artifact.checksum_value,
+            ),
+        ),
         subject=SubjectKey(session.identity, "1"),
         output_identity="age",
     )
