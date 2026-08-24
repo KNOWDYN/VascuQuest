@@ -18,6 +18,7 @@ from vascuquest.provenance import (
     CanonicalJSON,
     ComponentReference,
     ProvenanceBuilder,
+    ProvenanceRecord,
     SourceArtifactReference,
     provenance_from_dict,
     provenance_from_json,
@@ -98,7 +99,7 @@ def _builder(dataset: DatasetIdentity | None = None) -> ProvenanceBuilder:
     )
 
 
-def _source_record() -> object:
+def _source_record() -> ProvenanceRecord:
     dataset = _dataset()
     return _builder(dataset).build(
         evidence=EvidenceClass.SOURCE,
