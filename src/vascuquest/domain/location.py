@@ -45,21 +45,22 @@ class MeasurementSite:
 class PathPosition:
     """One source-supported indexed position along a canonical arterial path.
 
-    The source point index identifies an actually stored position; it does not
-    imply interpolation between stored positions. Path distance, units,
-    orientation, segment mapping, and within-segment distance are retained by
-    the canonical schema/result metadata when available.
+    The canonical position index refers to an actually supported stored
+    position; it does not imply interpolation between stored positions. Source
+    point indices, path distance, units, orientation, segment mapping, and
+    within-segment distance remain explicit schema/result metadata when
+    available.
     """
 
     canonical_path_id: str
-    source_point_index: int
+    position_index: int
 
     def __post_init__(self) -> None:
         _validate_location_id(self.canonical_path_id, "canonical_path_id")
-        if isinstance(self.source_point_index, bool) or not isinstance(self.source_point_index, int):
-            raise TypeError("source_point_index must be an integer")
-        if self.source_point_index < 0:
-            raise ValueError("source_point_index must be non-negative")
+        if isinstance(self.position_index, bool) or not isinstance(self.position_index, int):
+            raise TypeError("position_index must be an integer")
+        if self.position_index < 0:
+            raise ValueError("position_index must be non-negative")
 
 
 VascularLocation: TypeAlias = SegmentLocation | MeasurementSite | PathPosition
