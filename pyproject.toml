@@ -47,3 +47,6 @@ dev = [
 [project.urls]
 Repository = "https://github.com/KNOWDYN/VascuQuest"
 Issues = "https://github.com/KNOWDYN/VascuQuest/issues"
+
+[tool.setuptools.package-data]
+vascuquest = ["schema/resources/*.json"]
