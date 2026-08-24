@@ -92,6 +92,22 @@ def _sorted_text(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(sorted(normalized))
 
 
+def _normalized_artifacts(
+    values: Iterable[SourceArtifactReference],
+) -> tuple[SourceArtifactReference, ...]:
+    normalized = tuple(values)
+    if any(not isinstance(value, SourceArtifactReference) for value in normalized):
+        raise TypeError("source_artifacts must contain SourceArtifactReference values")
+    return tuple(sorted(normalized, key=lambda item: item.artifact_id))
+
+
+def _normalized_inputs(values: Iterable[ProvenanceRecord]) -> tuple[ProvenanceRecord, ...]:
+    normalized = tuple(values)
+    if any(not isinstance(value, ProvenanceRecord) for value in normalized):
+        raise TypeError("inputs must contain ProvenanceRecord values")
+    return tuple(sorted(normalized, key=lambda item: item.record_id))
+
+
 def _record_fingerprint(
     *,
     dataset_identity: DatasetIdentity,
@@ -198,8 +214,8 @@ class ProvenanceBuilder:
         if not isinstance(value_state, ValueState):
             raise TypeError("value_state must be a ValueState")
 
-        artifacts = tuple(sorted(tuple(source_artifacts), key=lambda item: item.artifact_id))
-        input_records = tuple(sorted(tuple(inputs), key=lambda item: item.record_id))
+        artifacts = _normalized_artifacts(source_artifacts)
+        input_records = _normalized_inputs(inputs)
         normalized_source_fields = _sorted_text(source_fields)
         normalized_assumptions = _sorted_text(assumptions)
         normalized_citations = _sorted_text(citations)
