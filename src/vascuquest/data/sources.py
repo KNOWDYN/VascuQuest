@@ -18,6 +18,15 @@ from .paths import DataPaths
 _REGISTRY_FORMAT_VERSION = 1
 
 
+def _normalize_mirror(base_url: str) -> str:
+    if not isinstance(base_url, str) or not base_url or base_url != base_url.strip():
+        raise ValueError("base_url must be a non-empty trimmed string")
+    parsed = urlparse(base_url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise ValueError("mirror base_url must be an absolute HTTPS URL")
+    return base_url.rstrip("/")
+
+
 class SourceKind(str, Enum):
     """Operational source kinds, separate from canonical dataset identity."""
 
@@ -92,12 +101,7 @@ class SourceRegistry:
     def register_mirror(self, base_url: str) -> str:
         """Register an HTTPS institutional mirror root."""
 
-        if not isinstance(base_url, str) or not base_url or base_url != base_url.strip():
-            raise ValueError("base_url must be a non-empty trimmed string")
-        parsed = urlparse(base_url)
-        if parsed.scheme != "https" or not parsed.netloc:
-            raise ValueError("mirror base_url must be an absolute HTTPS URL")
-        normalized = base_url.rstrip("/")
+        normalized = _normalize_mirror(base_url)
         if normalized not in self._mirrors:
             self._mirrors.append(normalized)
             self._save()
@@ -169,8 +173,19 @@ class SourceRegistry:
             raise ValueError("source registry local_roots must be a JSON string array")
         if not isinstance(mirrors, list) or not all(isinstance(v, str) for v in mirrors):
             raise ValueError("source registry mirrors must be a JSON string array")
-        self._local_roots = [Path(value) for value in local_roots]
-        self._mirrors = list(mirrors)
+        if len(set(local_roots)) != len(local_roots) or len(set(mirrors)) != len(mirrors):
+            raise ValueError("source registry state must not contain duplicate sources")
+
+        loaded_roots: list[Path] = []
+        for value in local_roots:
+            path = Path(value)
+            if not path.is_absolute():
+                raise ValueError("persisted local source roots must be absolute paths")
+            loaded_roots.append(path)
+        loaded_mirrors = [_normalize_mirror(value) for value in mirrors]
+
+        self._local_roots = loaded_roots
+        self._mirrors = loaded_mirrors
 
     def _save(self) -> None:
         self._state_file.parent.mkdir(parents=True, exist_ok=True)
