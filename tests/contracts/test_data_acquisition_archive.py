@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import io
 from pathlib import Path
 import stat
+import threading
 from urllib.error import URLError
 import zipfile
 
@@ -153,6 +155,46 @@ def test_successful_network_acquisition_streams_verifies_and_atomically_promotes
     assert resolved == paths.source_artifact(artifact.filename)
     assert resolved.read_bytes() == payload
     assert calls == [artifact.source_locator]
+    assert list(paths.work.iterdir()) == []
+
+
+def test_concurrent_acquirers_converge_on_one_verified_final_file(tmp_path: Path) -> None:
+    payload = b"canonical-download"
+    artifact = _artifact(payload)
+    paths = DataPaths.under(tmp_path / "managed")
+    paths.ensure()
+    registry = SourceRegistry(paths.state_file("sources.json"))
+    barrier = threading.Barrier(2)
+
+    def opener(url: str):
+        barrier.wait(timeout=5)
+        return _Response(payload)
+
+    first = ArtifactAcquirer(
+        paths,
+        registry,
+        manifest=_manifest(artifact),
+        opener=opener,
+        chunk_size=4,
+    )
+    second = ArtifactAcquirer(
+        paths,
+        registry,
+        manifest=_manifest(artifact),
+        opener=opener,
+        chunk_size=4,
+    )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(first.acquire, artifact.artifact_id),
+            executor.submit(second.acquire, artifact.artifact_id),
+        ]
+        resolved = [future.result(timeout=10) for future in futures]
+
+    expected = paths.source_artifact(artifact.filename)
+    assert resolved == [expected, expected]
+    assert expected.read_bytes() == payload
     assert list(paths.work.iterdir()) == []
 
 
