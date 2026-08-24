@@ -1,5 +1,6 @@
 """Stable public Python surface for VascuQuest core v1."""
 
+from . import plugins as plugins
 from ._version import __version__
 from .api import DatasetSession
 from .bootstrap import open_dataset, register_source
@@ -64,5 +65,6 @@ __all__ = [
     "Waveform",
     "__version__",
     "open_dataset",
+    "plugins",
     "register_source",
 ]
