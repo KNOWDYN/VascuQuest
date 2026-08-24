@@ -159,12 +159,12 @@ Not every command must expose every option.
 Semantics:
 
 - `--offline` forbids network acquisition;
-- `--format` selects presentation/serialization only and must not alter scientific computation;
-- `--output` writes the primary result to a file instead of standard output when supported;
+- `--format` selects the CLI presentation/serialization of the primary result only; it never selects a scientific exporter;
+- `--output` writes that primary CLI result to a file instead of standard output when supported;
 - `--quiet` suppresses nonessential human diagnostics, not requested scientific data;
 - `--debug` enables chained diagnostic detail/tracebacks on standard error.
 
-Scientific method parameters are command-specific and are normalized to the serializable parameter mapping defined in `API_PLUGIN_CONTRACT.md`.
+Scientific export uses the separate `export` command and an explicit exporter ID. Scientific method parameters are command-specific and are normalized to the serializable parameter mapping defined in `API_PLUGIN_CONTRACT.md`.
 
 ---
 
@@ -340,21 +340,20 @@ Purpose: explicitly acquire canonical source artifacts or capability bundles.
 Conceptual usage:
 
 ```text
-vascuquest dataset acquire --artifact pwdb_model_configs.csv
-vascuquest dataset acquire --capability common-waveforms
-vascuquest dataset acquire --capability path:aorta-brain
+vascuquest dataset acquire --artifact <artifact-id>
+vascuquest dataset acquire --capability <capability-id>
 ```
 
-The exact capability IDs come from the backend capability registry rather than being hard-coded independently in the CLI.
+Artifact and capability IDs come from the packaged manifest/backend capability registry rather than being hard-coded independently in the CLI. A canonical filename may be accepted as an artifact alias only when the manifest defines it unambiguously.
 
-Before downloading a multi-gigabyte artifact, the command must report:
+Before downloading a large artifact or bundle, the command must report:
 
 - artifact/capability requested;
 - artifact filenames;
 - expected total size when known;
 - destination/cache context.
 
-Interactive execution requests confirmation for large acquisition unless `--yes` is supplied.
+Interactive execution requests confirmation for a large acquisition unless `--yes` is supplied.
 
 Non-interactive execution without a TTY must not hang waiting for confirmation; it fails with a clear instruction to use `--yes` when confirmation is required.
 
@@ -417,13 +416,19 @@ vascuquest subjects --where age=55 --where plausibility=<canonical-value>
 vascuquest subjects --format jsonl
 ```
 
-`--where` is a simple repeated field comparison mechanism over validated canonical subject attributes.
+`--where` is a repeated exact-match filter over validated canonical subject attributes.
 
-V1 does **not** introduce a full expression language.
+The v1 grammar is exactly:
 
-The initial selector supports equality and a small set of typed comparison operators only if implementation remains unambiguous. More complex filtering belongs in Python until justified.
+```text
+--where <canonical-field>=<value>
+```
 
-Missing-value policy must be explicit whenever the filter could otherwise silently exclude subjects.
+The value is parsed according to the schema-defined field type. Repeating `--where` combines conditions with logical AND.
+
+V1 deliberately does **not** implement range operators, OR expressions, arbitrary predicates, SQL fragments, or a custom query language. More complex cohort construction remains available through the Python API until a real requirement justifies a richer CLI grammar.
+
+Missing-value behavior must follow an explicit application-level policy; exact-match filtering must not silently reinterpret missing values as ordinary values.
 
 ---
 
@@ -636,22 +641,26 @@ This is the primary CLI mechanism for researchers to understand a method before 
 
 ## 27. `export`
 
-Purpose: serialize a previously obtained result or a result reference through a registered exporter.
+Purpose: serialize a saved/portable VascuQuest result through a registered result exporter.
 
 Conceptual usage:
 
 ```text
-vascuquest export <result-or-provenance-reference> --format <export-format> --output <path>
+vascuquest export <result-file> --exporter <qualified-id> --output <path>
+vascuquest export <result-file> --exporter <qualified-id> --param name=value --output <path>
 ```
-
-Where shell chaining is practical, commands may also support direct `--output` on the producing command so users are not forced to persist an intermediate registry entry.
 
 Rules:
 
+- `--exporter` selects a registered `ResultExporter` by qualified component ID;
+- exporter options use the same validated `--param name=value` mechanism where options are needed;
+- `--format` is **not** reused to select an exporter or exporter-specific format;
 - export does not alter scientific values;
 - evidence/provenance are retained or written to a companion metadata file when the target cannot hold them;
 - ambiguous lossy export requires explicit user choice or fails;
-- result exporter plugins are identified in output provenance/metadata when they materially affect representation.
+- exporter identity/version enters representation metadata/provenance where material.
+
+Producing commands may use `--output` to save their own selected CLI serialization directly. That is distinct from invoking a scientific `ResultExporter`.
 
 V1 does not require a persistent global result database merely to support `export`.
 
@@ -679,30 +688,21 @@ Rules:
 
 ## 29. Selection syntax
 
-The CLI intentionally avoids a bespoke scientific query language in v1.
-
-Simple filtering uses repeated structured conditions such as:
+The v1 CLI deliberately supports only exact-match filtering:
 
 ```text
---where field=value
+--where <canonical-field>=<value>
 ```
 
-If comparison operators are implemented, the accepted grammar must be deliberately small and documented, for example canonical forms equivalent to:
+Repeated filters are combined with logical AND.
 
-```text
-field=value
-field!=value
-field>value
-field>=value
-field<value
-field<=value
-```
+Values are parsed according to schema-defined field types.
 
-String parsing must use schema-defined data types.
+No Python `eval`, comparison-expression parser, OR syntax, SQL fragment, or executable predicate is accepted.
 
-No Python `eval`, arbitrary expressions, SQL fragments, or executable predicates are accepted.
+Range, compound, matched, weighted, or other advanced cohort logic remains available through the Python API until its real CLI requirements are established.
 
-Complex cohort construction remains available through the Python API until a real need justifies richer CLI syntax.
+This keeps the CLI predictable across shells and avoids quoting/redirection ambiguity around operators such as `<` and `>`.
 
 ---
 
@@ -762,13 +762,23 @@ No scientific result depends on whether execution is interactive.
 
 ## 32. Large-download safeguard
 
-V1 defines a large acquisition operationally as an acquisition for which the backend/data layer marks confirmation as advisable based on artifact size/policy.
+For v1, an acquisition requires large-download confirmation when either:
 
-The CLI contract does **not** invent a fixed scientific threshold.
+```text
+any planned canonical artifact >= 1 GiB
+```
 
-For a large acquisition, the CLI must display expected size and obtain confirmation in interactive mode unless `--yes` is supplied.
+or
 
-This mechanism is operational protection only; it does not alter capability resolution or source identity.
+```text
+the total planned acquisition >= 1 GiB.
+```
+
+This **1 GiB threshold is an operational safety default**, not a scientific threshold and not part of dataset identity. A future configuration option may lower it, but v1 must never silently raise it above the built-in default.
+
+For a large acquisition, the CLI displays the expected size and obtains confirmation in interactive mode unless `--yes` is supplied.
+
+This rule protects users from accidental multi-gigabyte downloads while leaving capability resolution unchanged.
 
 ---
 
@@ -1016,6 +1026,9 @@ The following must remain true in code.
 18. debug tracebacks are opt-in.
 19. no arbitrary Python evaluation occurs in filters/params/workflows.
 20. the CLI remains cross-platform without external shell-tool dependencies.
+21. `--format` always means CLI presentation serialization; scientific exporters are selected only by `--exporter` on `export`.
+22. v1 `--where` filtering is exact-match AND filtering only.
+23. acquisition plans at or above 1 GiB require the large-download safeguard.
 
 ---
 
@@ -1076,15 +1089,11 @@ A command using `--format json` encounters a checksum error.
 
 Expected: no malformed partial JSON is mixed with error text; error appears on stderr; exit `4`.
 
-### H. Destructive clean in CI
+### H. Large acquisition in CI
 
-```text
-vascuquest dataset clean --derived
-```
+A non-interactive command plans at least 1 GiB of acquisition and `--yes` is absent.
 
-without a TTY and where confirmation is required.
-
-Expected: fail rather than hang; instruct use of `--yes`.
+Expected: fail rather than hang or download silently; report the planned size and instruct use of `--yes`.
 
 ---
 
@@ -1123,6 +1132,7 @@ Expected: fail rather than hang; instruct use of `--yes`.
 - Are exit codes stable and small in number?
 - Can non-interactive execution avoid prompts/hangs?
 - Is structured output deterministic and parseable?
+- Does `--format` retain one meaning across commands?
 
 ### Architecture/API compatibility
 
@@ -1142,7 +1152,8 @@ Once this contract passes audit:
 - the v1 command grammar is frozen;
 - stdout/stderr and machine-output behavior are frozen;
 - exit-code categories are frozen;
-- selection and method-parameter syntax are frozen at their intentionally small v1 scope;
+- exact-match `--where` and method-parameter syntax are frozen at their intentionally small v1 scope;
+- the 1 GiB large-acquisition safeguard is frozen as an operational default;
 - Typer is approved as the v1 adapter without entering scientific layers;
 - exact help prose and cosmetic terminal formatting may evolve without changing semantics;
 - the next contract is `TEST_VALIDATION_CONTRACT.md`.
