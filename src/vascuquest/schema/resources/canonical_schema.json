@@ -13,7 +13,8 @@
   ],
   "allowed_location_contexts": [
     "measurement_site",
-    "path_position"
+    "path_position",
+    "segment"
   ],
   "quantities": [
     {
@@ -117,6 +118,184 @@
           "canonical_unit": "au"
         }
       ]
+    },
+    {
+      "canonical_name": "age",
+      "label": "Simulation age",
+      "description": "Source model age assigned to the virtual simulation instance.",
+      "value_kind": "numeric",
+      "physical_dimension": "time",
+      "canonical_unit": "years",
+      "allowed_source_units": ["years"],
+      "applicable_contexts": [],
+      "source_aliases": ["age"],
+      "default_evidence": "SOURCE",
+      "known_source_issues": [],
+      "citations": ["doi:10.1152/ajpheart.00218.2019"],
+      "category": "model_parameter",
+      "source_mappings": [
+        {"source_scope": "model_configurations", "source_field": "age [years]", "source_unit": "years", "canonical_unit": "years"},
+        {"source_scope": "haemodynamic_parameters", "source_field": "age [years]", "source_unit": "years", "canonical_unit": "years"},
+        {"source_scope": "pulse_wave_indices", "source_field": "Age", "source_unit": "years", "canonical_unit": "years"}
+      ]
+    },
+    {
+      "canonical_name": "heart_rate",
+      "label": "Heart rate",
+      "description": "Source heart-rate parameter for the virtual simulation.",
+      "value_kind": "numeric",
+      "physical_dimension": "frequency",
+      "canonical_unit": "bpm",
+      "allowed_source_units": ["bpm"],
+      "applicable_contexts": [],
+      "source_aliases": ["hr", "HR"],
+      "default_evidence": "SOURCE",
+      "known_source_issues": [],
+      "citations": ["doi:10.1152/ajpheart.00218.2019"],
+      "category": "haemodynamic_parameter",
+      "source_mappings": [
+        {"source_scope": "model_configurations", "source_field": "hr [bpm]", "source_unit": "bpm", "canonical_unit": "bpm"},
+        {"source_scope": "haemodynamic_parameters", "source_field": "HR [bpm]", "source_unit": "bpm", "canonical_unit": "bpm"}
+      ]
+    },
+    {
+      "canonical_name": "stroke_volume",
+      "label": "Stroke volume",
+      "description": "Source stroke-volume parameter for the virtual simulation.",
+      "value_kind": "numeric",
+      "physical_dimension": "volume",
+      "canonical_unit": "ml",
+      "allowed_source_units": ["ml"],
+      "applicable_contexts": [],
+      "source_aliases": ["sv", "SV"],
+      "default_evidence": "SOURCE",
+      "known_source_issues": [],
+      "citations": ["doi:10.1152/ajpheart.00218.2019"],
+      "category": "haemodynamic_parameter",
+      "source_mappings": [
+        {"source_scope": "model_configurations", "source_field": "sv [ml]", "source_unit": "ml", "canonical_unit": "ml"},
+        {"source_scope": "haemodynamic_parameters", "source_field": "SV [ml]", "source_unit": "ml", "canonical_unit": "ml"}
+      ]
+    },
+    {
+      "canonical_name": "cardiac_output",
+      "label": "Cardiac output",
+      "description": "Source cardiac-output haemodynamic parameter.",
+      "value_kind": "numeric",
+      "physical_dimension": "volume_flow_rate",
+      "canonical_unit": "l/min",
+      "allowed_source_units": ["l/min"],
+      "applicable_contexts": [],
+      "source_aliases": ["CO"],
+      "default_evidence": "SOURCE",
+      "known_source_issues": [],
+      "citations": ["doi:10.1152/ajpheart.00218.2019"],
+      "category": "haemodynamic_parameter",
+      "source_mappings": [
+        {"source_scope": "haemodynamic_parameters", "source_field": "CO [l/min]", "source_unit": "l/min", "canonical_unit": "l/min"}
+      ]
+    },
+    {
+      "canonical_name": "brachial_systolic_pressure",
+      "label": "Brachial systolic pressure",
+      "description": "Source systolic pressure reported at the brachial measurement site.",
+      "value_kind": "numeric",
+      "physical_dimension": "pressure",
+      "canonical_unit": "mmHg",
+      "allowed_source_units": ["mmHg"],
+      "applicable_contexts": ["measurement_site"],
+      "source_aliases": ["SBP_b"],
+      "default_evidence": "SOURCE",
+      "known_source_issues": [],
+      "citations": ["doi:10.1152/ajpheart.00218.2019"],
+      "category": "pulse_wave_index",
+      "source_mappings": [
+        {"source_scope": "pulse_wave_indices", "source_field": "Brachial_SBP_V", "source_unit": "mmHg", "canonical_unit": "mmHg"},
+        {"source_scope": "haemodynamic_parameters", "source_field": "SBP_b [mmHg]", "source_unit": "mmHg", "canonical_unit": "mmHg"}
+      ]
+    },
+    {
+      "canonical_name": "aortic_pulse_wave_velocity",
+      "label": "Aortic pulse wave velocity",
+      "description": "Source aortic pulse-wave velocity haemodynamic parameter.",
+      "value_kind": "numeric",
+      "physical_dimension": "velocity",
+      "canonical_unit": "m/s",
+      "allowed_source_units": ["m/s"],
+      "applicable_contexts": [],
+      "source_aliases": ["PWV_a"],
+      "default_evidence": "SOURCE",
+      "known_source_issues": [],
+      "citations": ["doi:10.1152/ajpheart.00218.2019"],
+      "category": "haemodynamic_parameter",
+      "source_mappings": [
+        {"source_scope": "haemodynamic_parameters", "source_field": "PWV_a [m/s]", "source_unit": "m/s", "canonical_unit": "m/s"}
+      ]
+    },
+    {
+      "canonical_name": "aortic_augmentation_index",
+      "label": "Aortic augmentation index",
+      "description": "Source pressure augmentation index at the aortic root.",
+      "value_kind": "numeric",
+      "physical_dimension": "dimensionless",
+      "canonical_unit": "%",
+      "allowed_source_units": ["%"],
+      "applicable_contexts": ["measurement_site"],
+      "source_aliases": ["AIx"],
+      "default_evidence": "SOURCE",
+      "known_source_issues": [],
+      "citations": ["doi:10.1152/ajpheart.00218.2019"],
+      "category": "pulse_wave_index",
+      "source_mappings": [
+        {"source_scope": "pulse_wave_indices", "source_field": "AorticRoot_AI", "source_unit": "%", "canonical_unit": "%"},
+        {"source_scope": "haemodynamic_parameters", "source_field": "AIx [%]", "source_unit": "%", "canonical_unit": "%"}
+      ]
+    },
+    {
+      "canonical_name": "pressure_onset_time",
+      "label": "Pressure onset time",
+      "description": "Source pressure-wave onset time relative to the aortic-root reference.",
+      "value_kind": "numeric",
+      "physical_dimension": "time",
+      "canonical_unit": "s",
+      "allowed_source_units": ["s"],
+      "applicable_contexts": ["measurement_site"],
+      "source_aliases": ["P_onset"],
+      "default_evidence": "SOURCE",
+      "known_source_issues": [],
+      "citations": ["doi:10.1152/ajpheart.00218.2019"],
+      "category": "onset_or_fiducial_time",
+      "source_mappings": [
+        {"source_scope": "onset_times", "source_field": "AorticRoot_P", "source_unit": "s", "canonical_unit": "s"},
+        {"source_scope": "onset_times", "source_field": "ThorAorta_P", "source_unit": "s", "canonical_unit": "s"},
+        {"source_scope": "onset_times", "source_field": "AbdAorta_P", "source_unit": "s", "canonical_unit": "s"},
+        {"source_scope": "onset_times", "source_field": "IliacBif_P", "source_unit": "s", "canonical_unit": "s"},
+        {"source_scope": "onset_times", "source_field": "Carotid_P", "source_unit": "s", "canonical_unit": "s"},
+        {"source_scope": "onset_times", "source_field": "SupTemporal_P", "source_unit": "s", "canonical_unit": "s"},
+        {"source_scope": "onset_times", "source_field": "SupMidCerebral_P", "source_unit": "s", "canonical_unit": "s"},
+        {"source_scope": "onset_times", "source_field": "Brachial_P", "source_unit": "s", "canonical_unit": "s"},
+        {"source_scope": "onset_times", "source_field": "Radial_P", "source_unit": "s", "canonical_unit": "s"},
+        {"source_scope": "onset_times", "source_field": "Digital_P", "source_unit": "s", "canonical_unit": "s"},
+        {"source_scope": "onset_times", "source_field": "CommonIliac_P", "source_unit": "s", "canonical_unit": "s"},
+        {"source_scope": "onset_times", "source_field": "Femoral_P", "source_unit": "s", "canonical_unit": "s"},
+        {"source_scope": "onset_times", "source_field": "AntTibial_P", "source_unit": "s", "canonical_unit": "s"}
+      ]
+    },
+    {
+      "canonical_name": "vascular_geometry",
+      "label": "Vascular geometry",
+      "description": "Source-provided per-segment vascular network geometry for one virtual subject.",
+      "value_kind": "structured",
+      "physical_dimension": null,
+      "canonical_unit": null,
+      "allowed_source_units": [],
+      "applicable_contexts": ["segment"],
+      "source_aliases": ["geo"],
+      "default_evidence": "SOURCE",
+      "known_source_issues": [],
+      "citations": ["doi:10.1152/ajpheart.00218.2019"],
+      "category": "geometry_parameter",
+      "source_mappings": []
     }
   ]
 }

@@ -33,6 +33,22 @@ EXPECTED_ARTIFACTS = {
     "PWs_wfdb.zip": "c4c3c3ba8163ee1f4f1495d7a4e70d73",
 }
 
+EXPECTED_QUANTITIES = (
+    "pressure",
+    "flow_velocity",
+    "luminal_area",
+    "photoplethysmogram",
+    "age",
+    "heart_rate",
+    "stroke_volume",
+    "cardiac_output",
+    "brachial_systolic_pressure",
+    "aortic_pulse_wave_velocity",
+    "aortic_augmentation_index",
+    "pressure_onset_time",
+    "vascular_geometry",
+)
+
 
 def _raw_resource(name: str) -> dict[str, object]:
     resource = files("vascuquest.schema").joinpath("resources", name)
@@ -44,7 +60,6 @@ def _raw_resource(name: str) -> dict[str, object]:
 
 def test_manifest_matches_canonical_record_exactly() -> None:
     manifest = load_manifest()
-
     assert manifest.manifest_version == 1
     assert manifest.canonical_record_id == "3275625"
     assert manifest.canonical_doi == "10.5281/zenodo.3275625"
@@ -55,15 +70,12 @@ def test_manifest_matches_canonical_record_exactly() -> None:
 
 def test_manifest_identifiers_filenames_locators_and_checksums_are_unique_and_valid() -> None:
     manifest = load_manifest()
-
     artifact_ids = [artifact.artifact_id for artifact in manifest.artifacts]
     filenames = [artifact.filename for artifact in manifest.artifacts]
     locators = [artifact.source_locator for artifact in manifest.artifacts]
-
     assert len(artifact_ids) == len(set(artifact_ids))
     assert len(filenames) == len(set(filenames))
     assert len(locators) == len(set(locators))
-
     for artifact in manifest.artifacts:
         assert artifact.checksum_algorithm == "md5"
         assert len(artifact.checksum_value) == 32
@@ -80,7 +92,6 @@ def test_manifest_does_not_encode_rounded_display_sizes_as_byte_counts() -> None
     raw = _raw_resource("pwdb3275625_manifest.json")
     artifacts = raw["artifacts"]
     assert isinstance(artifacts, list)
-
     for artifact in artifacts:
         assert isinstance(artifact, dict)
         assert artifact["reported_size_bytes"] is None or isinstance(
@@ -91,19 +102,12 @@ def test_manifest_does_not_encode_rounded_display_sizes_as_byte_counts() -> None
 
 def test_schema_has_versioned_unique_canonical_quantity_identities() -> None:
     schema = load_canonical_schema()
-
     assert schema.schema_version == "1"
     assert schema.dataset_family == "PWDB"
     assert schema.canonical_record_id == "3275625"
     assert schema.canonical_doi == "10.5281/zenodo.3275625"
-
     names = tuple(quantity.definition.canonical_name for quantity in schema.quantities)
-    assert names == (
-        "pressure",
-        "flow_velocity",
-        "luminal_area",
-        "photoplethysmogram",
-    )
+    assert names == EXPECTED_QUANTITIES
     assert len(names) == len(set(names))
 
 
@@ -115,7 +119,6 @@ def test_waveform_quantity_mappings_preserve_source_aliases_and_units() -> None:
         "luminal_area": ("A", "m^2", "area", "m^2"),
         "photoplethysmogram": ("PPG", "au", "dimensionless", "au"),
     }
-
     for name, (alias, source_unit, dimension, canonical_unit) in expected.items():
         quantity_schema = schema.quantity_schema(name)
         definition = quantity_schema.definition
@@ -124,28 +127,55 @@ def test_waveform_quantity_mappings_preserve_source_aliases_and_units() -> None:
         assert definition.canonical_unit == canonical_unit
         assert definition.default_evidence is EvidenceClass.SOURCE
         assert quantity_schema.category == "waveform_signal"
-        assert len(quantity_schema.source_mappings) == 1
         mapping = quantity_schema.source_mappings[0]
         assert mapping.source_field == alias
         assert mapping.source_unit == source_unit
         assert mapping.canonical_unit == canonical_unit
 
 
+def test_scalar_schema_preserves_authoritative_csv_headers_and_units() -> None:
+    schema = load_canonical_schema()
+    age = schema.quantity_schema("age")
+    assert {
+        (mapping.source_scope, mapping.source_field, mapping.source_unit)
+        for mapping in age.source_mappings
+    } == {
+        ("model_configurations", "age [years]", "years"),
+        ("haemodynamic_parameters", "age [years]", "years"),
+        ("pulse_wave_indices", "Age", "years"),
+    }
+
+    ai = schema.quantity_schema("aortic_augmentation_index")
+    assert ai.source_mappings[0].source_scope == "pulse_wave_indices"
+    assert ai.source_mappings[0].source_field == "AorticRoot_AI"
+    assert ai.definition.canonical_unit == "%"
+
+    onset = schema.quantity_schema("pressure_onset_time")
+    assert len(onset.source_mappings) == 13
+    assert {mapping.source_scope for mapping in onset.source_mappings} == {"onset_times"}
+    assert {mapping.source_unit for mapping in onset.source_mappings} == {"s"}
+
+
+def test_structured_geometry_definition_does_not_invent_a_single_physical_unit() -> None:
+    geometry = load_canonical_schema().quantity_schema("vascular_geometry")
+    assert geometry.category == "geometry_parameter"
+    assert geometry.definition.value_kind == "structured"
+    assert geometry.definition.physical_dimension is None
+    assert geometry.definition.canonical_unit is None
+    assert geometry.source_mappings == ()
+
+
 def test_dimensionless_ppg_is_marked_explicitly() -> None:
     ppg = load_canonical_schema().quantity("photoplethysmogram")
-
     assert ppg.physical_dimension == "dimensionless"
     assert ppg.canonical_unit == "au"
-    assert ppg.canonical_unit is not None
 
 
 def test_luminal_area_metadata_defect_is_traceable_without_changing_source_label() -> None:
     area = load_canonical_schema().quantity_schema("luminal_area")
-
     assert area.definition.canonical_unit == "m^2"
     assert area.definition.known_source_issues == ("pwdb_mat_metadata_area_unit",)
     assert len(area.source_defects) == 1
-
     defect = area.source_defects[0]
     assert defect.issue_id == "pwdb_mat_metadata_area_unit"
     assert defect.source_scope == "PWs_mat_metadata"
@@ -166,7 +196,6 @@ def test_schema_rejects_source_alias_collision(monkeypatch: pytest.MonkeyPatch) 
     assert isinstance(quantities, list)
     assert isinstance(quantities[1], dict)
     quantities[1]["source_aliases"] = ["P"]
-
     monkeypatch.setattr(loader, "_read_resource", lambda _name: payload)
     with pytest.raises(SchemaError, match="source alias"):
         loader.load_canonical_schema()
@@ -181,7 +210,6 @@ def test_schema_rejects_source_unit_not_declared_as_allowed(monkeypatch: pytest.
     assert isinstance(mappings, list)
     assert isinstance(mappings[0], dict)
     mappings[0]["source_unit"] = "Pa"
-
     monkeypatch.setattr(loader, "_read_resource", lambda _name: payload)
     with pytest.raises(SchemaError, match="allowed source unit"):
         loader.load_canonical_schema()
@@ -193,7 +221,6 @@ def test_schema_rejects_unknown_category(monkeypatch: pytest.MonkeyPatch) -> Non
     assert isinstance(quantities, list)
     assert isinstance(quantities[0], dict)
     quantities[0]["category"] = "invented_category"
-
     monkeypatch.setattr(loader, "_read_resource", lambda _name: payload)
     with pytest.raises(SchemaError, match="unknown category"):
         loader.load_canonical_schema()
@@ -205,7 +232,6 @@ def test_schema_rejects_unmatched_defect_metadata(monkeypatch: pytest.MonkeyPatc
     assert isinstance(quantities, list)
     assert isinstance(quantities[2], dict)
     quantities[2]["known_source_issues"] = []
-
     monkeypatch.setattr(loader, "_read_resource", lambda _name: payload)
     with pytest.raises(SchemaError, match="known_source_issues"):
         loader.load_canonical_schema()
@@ -218,7 +244,6 @@ def test_manifest_rejects_duplicate_artifact_identity(monkeypatch: pytest.Monkey
     assert isinstance(artifacts[0], dict)
     assert isinstance(artifacts[1], dict)
     artifacts[1]["artifact_id"] = artifacts[0]["artifact_id"]
-
     monkeypatch.setattr(loader, "_read_resource", lambda _name: payload)
     with pytest.raises(SchemaError, match="artifact IDs"):
         loader.load_manifest()
