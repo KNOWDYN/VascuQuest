@@ -104,13 +104,15 @@ Do not add Poetry, Hatch, PDM, Conda metadata, or a second dependency authority 
 
 Only dependencies needed by broad v1 behavior should be mandatory.
 
-The implementation baseline may include:
+The initial baseline may include:
 
 ```text
-numpy >=2.4,<3
+numpy >=2.0,<3
 Typer >=0.27,<1
 platformdirs >=4,<5
 ```
+
+The lower NumPy bound avoids requiring a specific recent patch/minor when VascuQuest does not use a 2.4-only feature; the supported CI environments use compatible contemporary NumPy builds.
 
 `platformdirs` is justified only for cross-platform user cache/data/state locations.
 
@@ -268,7 +270,7 @@ This tree is a build target, not permission to create empty placeholder modules.
 
 ---
 
-## 7. Batch 0 — Packaging and executable skeleton
+## 7. Batch 0 — Packaging and import skeleton
 
 ### Files, in order
 
@@ -277,17 +279,18 @@ This tree is a build target, not permission to create empty placeholder modules.
 3. `src/vascuquest/_version.py`
 4. `src/vascuquest/errors.py`
 5. `src/vascuquest/__init__.py`
-6. `src/vascuquest/__main__.py`
-7. minimal packaging smoke tests
+6. minimal packaging smoke tests
 
 ### Responsibilities
 
 - package metadata;
 - Apache-2.0 project licence;
 - Python `>=3.11,<3.15` declaration;
-- `vascuquest` console entry point;
+- build backend/configuration;
 - stable top-level exception root;
-- importable package with no dataset/network side effects.
+- importable package with no dataset/network/CLI side effects.
+
+The console-script entry point and `__main__.py` are deliberately **not** created yet. They belong to Batch 13 when the real CLI exists; creating an executable stub now would add disposable code and rework.
 
 ### Gate 0
 
@@ -295,12 +298,12 @@ Must demonstrate:
 
 ```text
 python -c "import vascuquest"
-python -m vascuquest --help
-vascuquest --help
 python -m build
 ```
 
-No scientific model or data reader is implemented in this batch.
+A built wheel must install into a clean environment and remain importable.
+
+No CLI, scientific model, or data reader is implemented in this batch.
 
 ---
 
@@ -634,7 +637,7 @@ Methods not installed/implemented fail clearly rather than being simulated.
 
 ## 18. Batch 11 — Built-in scientific components
 
-### Initial file
+### Initial files
 
 1. `methods/reconstructions.py`
 2. `methods/__init__.py`
@@ -656,7 +659,7 @@ A candidate discovery method receives its own implementation file and method-spe
 
 Project-specific Womersley, anisotropy, fractional, susceptibility, CGL, or other paper-derived formulations are not rushed into core v1 merely to populate the operator registry.
 
-They may be implemented later as separately validated built-in or external operators while preserving the three-paper mathematics exactly.
+They may be implemented later as separately validated built-in or external operators while preserving the source mathematics exactly.
 
 ### Gate 11
 
@@ -688,14 +691,15 @@ Export round trips preserve required scientific identity, evidence, units, coord
 
 ## 20. Batch 13 — CLI
 
-### Files, in order
+### Files/changes, in order
 
 1. `cli/rendering.py`
 2. `cli/commands.py`
 3. `cli/app.py`
 4. `cli/__init__.py`
-5. update `__main__.py`
-6. CLI tests
+5. `src/vascuquest/__main__.py`
+6. amend `pyproject.toml` to add the `vascuquest` console-script entry point
+7. CLI tests
 
 ### Responsibilities
 
@@ -712,6 +716,15 @@ The CLI performs only:
 
 ### Gate 13
 
+Must demonstrate both executable forms:
+
+```text
+python -m vascuquest --help
+vascuquest --help
+```
+
+and establish that:
+
 - JSON/JSONL/CSV stdout is never polluted by diagnostics;
 - noninteractive confirmation behavior is deterministic;
 - large-download safeguards work;
@@ -723,11 +736,11 @@ The CLI performs only:
 
 ## 21. Batch 14 — CI, package checks, and public README
 
-### Files, in order
+### Files/changes, in order
 
 1. CI workflow file(s), kept minimal
 2. update `README.md`
-3. any required package metadata classifiers/entry points in `pyproject.toml`
+3. finalize required package metadata/classifiers/entry points in `pyproject.toml`
 4. final install/build smoke tests
 
 ### CI matrix
@@ -783,7 +796,7 @@ Although the batches define dependency order, implementation should produce usef
 The preferred progression is:
 
 ```text
-install/import/help
+install/import
     -> dataset identity + manifest
     -> subjects + CSV quantities
     -> cohorts
