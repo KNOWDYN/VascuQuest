@@ -33,7 +33,7 @@ class SelectionService:
         requested: set[str] | None = None
         selection_specification: list[str] = []
         if subject_ids is not None:
-            raw_ids = tuple(subject_ids)
+            raw_ids = (subject_ids,) if isinstance(subject_ids, str) else tuple(subject_ids)
             if any(not isinstance(value, str) or not value or value != value.strip() for value in raw_ids):
                 raise SelectionError("subject_ids must contain non-empty trimmed strings")
             if len(set(raw_ids)) != len(raw_ids):
