@@ -38,6 +38,10 @@ class AdmissibilityError(VascuQuestError):
     """Raised when scientific inputs fall outside a method's admissible domain."""
 
 
+class NumericalMethodError(VascuQuestError):
+    """Raised when an expected scientific numerical method fails to complete."""
+
+
 class PluginError(VascuQuestError):
     """Raised when plugin discovery, loading, or activation fails."""
 
@@ -59,6 +63,7 @@ __all__ = [
     "CapabilityError",
     "DatasetUnavailableError",
     "IntegrityError",
+    "NumericalMethodError",
     "PluginCompatibilityError",
     "PluginError",
     "ReproducibilityError",
