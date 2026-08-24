@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib.metadata import version as distribution_version
 from pathlib import Path
 import tomllib
 
@@ -38,17 +39,19 @@ def test_package_import_exposes_version() -> None:
     assert vascuquest.__version__
 
 
-def test_runtime_version_matches_project_metadata() -> None:
-    assert vascuquest.__version__ == _project_version()
+def test_source_runtime_and_distribution_versions_agree() -> None:
+    project_version = _project_version()
+    assert vascuquest.__version__ == project_version
+    assert distribution_version("vascuquest") == project_version
 
 
 def test_public_exception_contract_is_exposed() -> None:
     assert set(errors.__all__) == EXPECTED_PUBLIC_ERRORS
     assert EXPECTED_PUBLIC_ERRORS <= set(vascuquest.__all__)
 
-    for name in EXPECTED_PUBLIC_ERRORS:
+    assert issubclass(errors.VascuQuestError, Exception)
+    for name in EXPECTED_PUBLIC_ERRORS - {"VascuQuestError"}:
         exception_type = getattr(vascuquest, name)
-        assert issubclass(exception_type, Exception)
+        assert issubclass(exception_type, errors.VascuQuestError)
 
     assert issubclass(errors.PluginCompatibilityError, errors.PluginError)
-    assert issubclass(errors.PluginError, errors.VascuQuestError)
