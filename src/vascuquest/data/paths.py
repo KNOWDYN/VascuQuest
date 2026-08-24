@@ -26,10 +26,10 @@ def _safe_leaf(name: str, field_name: str) -> str:
 class DataPaths:
     """Separated VascuQuest persistence namespaces.
 
-    Canonical source artifacts and user results use persistent data locations;
-    temporary work and rebuildable derived products use cache locations; state
-    metadata uses the platform state location. No path is inside the installed
-    Python package.
+    Canonical source artifacts, incomplete download work, and user results use
+    the persistent data root so verified work can be atomically promoted into
+    ``source/``. Rebuildable derived products use the cache root; state metadata
+    uses the platform state location. No path is inside the installed package.
     """
 
     source: Path
@@ -53,7 +53,7 @@ class DataPaths:
         state_root = Path(user_state_path(_APP_NAME, _APP_AUTHOR))
         return cls(
             source=data_root / "source",
-            work=cache_root / "work",
+            work=data_root / "work",
             derived=cache_root / "derived",
             results=data_root / "results",
             state=state_root,
