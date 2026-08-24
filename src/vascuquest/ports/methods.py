@@ -42,7 +42,12 @@ def _text_tuple(values: tuple[str, ...], field_name: str) -> None:
 
 @dataclass(frozen=True, slots=True)
 class ParameterSpec:
-    """Portable declaration of one scientific method parameter."""
+    """Portable declaration of one scientific method parameter.
+
+    ``allowed_values`` remains storage-agnostic because legitimate parameter
+    values may be numeric, boolean, textual, or another later-normalized
+    portable scalar. Application services own serialization normalization.
+    """
 
     name: str
     kind: str
@@ -50,7 +55,7 @@ class ParameterSpec:
     required: bool = False
     default: object | None = None
     unit: str | None = None
-    allowed_values: tuple[str, ...] = ()
+    allowed_values: tuple[object, ...] = ()
 
     def __post_init__(self) -> None:
         _required_text(self.name, "name")
@@ -59,7 +64,8 @@ class ParameterSpec:
         if not isinstance(self.required, bool):
             raise TypeError("required must be a boolean")
         _optional_text(self.unit, "unit")
-        _text_tuple(self.allowed_values, "allowed_values")
+        if not isinstance(self.allowed_values, tuple):
+            raise TypeError("allowed_values must be a tuple")
         if self.required and self.default is not None:
             raise ValueError("a required parameter must not also declare a default")
 
