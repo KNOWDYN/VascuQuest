@@ -1,7 +1,7 @@
 """Immutable scientific identity value objects.
 
 Identity in VascuQuest is independent of local paths, filenames, caches, and
-source-reader implementation details.  A virtual subject is identifiable only
+source-reader implementation details. A virtual subject is identifiable only
 within the exact dataset identity that contains it.
 """
 
@@ -39,12 +39,12 @@ class DatasetIdentity:
 class SubjectKey:
     """Identity of one canonical virtual subject within an exact dataset."""
 
-    dataset: DatasetIdentity
+    dataset_identity: DatasetIdentity
     canonical_subject_id: str
 
     def __post_init__(self) -> None:
-        if not isinstance(self.dataset, DatasetIdentity):
-            raise TypeError("dataset must be a DatasetIdentity")
+        if not isinstance(self.dataset_identity, DatasetIdentity):
+            raise TypeError("dataset_identity must be a DatasetIdentity")
         _validate_identity_text(self.canonical_subject_id, "canonical_subject_id")
 
 
