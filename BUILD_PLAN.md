@@ -25,11 +25,11 @@ The plan optimizes for **correct implementation with low rework**, not maximum f
 
 ---
 
-## 2. Execution rule: three files per pass
+## 2. Execution rule: three files per internal pass
 
-Implementation normally proceeds in **passes of three repository files**.
+Implementation proceeds in **internal passes of at most three repository files**.
 
-Three files is the default and maximum pass size. A pass may be reduced to one or two files when a file is scientifically sensitive, empirically gated, unusually coupled, or depends on unresolved behavior. A pass must never exceed three files merely for speed.
+Three files is the default and maximum internal pass size. A pass may be reduced to one or two files when a file is scientifically sensitive, empirically gated, unusually coupled, or depends on unresolved behavior. A pass must never exceed three files merely for speed.
 
 Within each pass, files are still implemented and checked sequentially rather than generated as an unaudited bundle:
 
@@ -47,6 +47,21 @@ Tests are part of implementation, not deferred cleanup. When a direct test lives
 
 No batch is considered complete merely because all planned files exist.
 
+### 2.1 Command execution window
+
+One user directive to continue building may advance through **up to two complete, fully gated batches**.
+
+This does not merge two batches into one implementation unit. The rules are:
+
+1. the active batch is completed using the three-file internal pass rule above;
+2. every required targeted test, pass regression, batch audit, and explicit batch exit gate must pass;
+3. only after the first batch is formally closed may implementation continue into the immediately following batch under the same user directive;
+4. the second batch is subject to the same internal pass, test, audit, and gate requirements as if it had been started by a separate directive;
+5. if any file, pass, or batch gate fails, progression stops at that point until the defect is resolved; the second batch must not be entered on the strength of partial success;
+6. no user directive advances through more than two fully gated batches.
+
+The two-batch window is a maximum, not a quota. It may automatically reduce to one batch when empirical access, scientific sensitivity, unresolved source behavior, or a hard gate makes further progression unsafe. In particular, Batch 8 remains an empirical hard gate, and Batch 11 scientific-method work may reduce the window when authoritative-definition or validation issues require focused review.
+
 ---
 
 ## 3. Build gate rule
@@ -60,6 +75,8 @@ A batch may advance only when:
 - no unresolved scientific ambiguity has been hidden behind implementation defaults;
 - public semantics created in that batch are internally consistent;
 - any remaining uncertainty is explicitly deferred to an already-approved later gate.
+
+A batch gate is never weakened or skipped merely because the same user directive authorizes work on a second batch. Crossing a batch boundary within one directive requires the first batch to be fully closed under its normal gate.
 
 The mandatory ingestion spike remains a **hard gate** before the production large-path backend/storage strategy is frozen.
 
@@ -934,7 +951,7 @@ If the authoritative material is insufficient to implement a method unambiguousl
 
 ## 30. Build audit after every pass and batch
 
-At each three-file pass boundary, audit five questions:
+At each three-file internal pass boundary, audit five questions:
 
 1. **Contract fidelity:** Does the implementation still satisfy all governing Markdown contracts?
 2. **Simplicity:** Did we add machinery not required by a current acceptance scenario?
@@ -944,7 +961,7 @@ At each three-file pass boundary, audit five questions:
 
 A "no" answer blocks the next pass.
 
-At each batch boundary, repeat the same audit over the cumulative batch and apply the batch exit gate in addition to the pass-level audit.
+At each batch boundary, repeat the same audit over the cumulative batch and apply the batch exit gate in addition to the pass-level audit. When a user directive authorizes a two-batch execution window, the second batch may begin only after this cumulative audit and the first batch exit gate both pass.
 
 ---
 
@@ -965,19 +982,23 @@ Do not rewrite the governing contracts during implementation unless a genuine co
 
 ---
 
-## 32. Session completion strategy
+## 32. Command/session completion strategy
 
-To maximize the amount that can be completed correctly in one working session:
+To maximize the amount that can be completed correctly under one user directive:
 
-1. prioritize deterministic local code and small-source functionality first;
-2. work in passes of at most three files, running the smallest relevant targeted checks after each file and a combined regression check after each pass;
-3. stop a pass immediately when a file exposes a contract, scientific, or test failure, and resolve that failure before adding another file;
-4. avoid optional feature work before the core vertical slice passes;
-5. perform real-data acquisition only when the next implementation decision actually depends on it;
-6. do not download the complete 44.3 GB merely for development convenience;
-7. separate code completion from full-dataset release validation when data-transfer/runtime constraints make Tier 4 impractical in the same environment.
+1. work through **up to two complete batches**, never more;
+2. within each batch, work in internal passes of at most three files, running the smallest relevant targeted checks after each file and a combined regression check after each pass;
+3. complete the active batch's full cumulative audit and explicit exit gate before entering the next batch;
+4. if the first batch fails any file check, pass regression, cumulative audit, or exit gate, stop progression and resolve the failure before any second batch begins;
+5. if the first batch passes, the immediately following batch may begin under the same directive and must independently satisfy the same pass/test/audit/gate sequence;
+6. automatically reduce the execution window to one batch when scientific sensitivity, empirical access, unresolved source behavior, or a hard gate makes continued progression unsafe;
+7. prioritize deterministic local code and small-source functionality first;
+8. avoid optional feature work before the core vertical slice passes;
+9. perform real-data acquisition only when the next implementation decision actually depends on it;
+10. do not download the complete 44.3 GB merely for development convenience;
+11. separate code completion from full-dataset release validation when data-transfer/runtime constraints make Tier 4 impractical in the same environment.
 
-The package must never claim a validation state that was not actually executed.
+The package must never claim a validation state that was not actually executed. A faster command cadence changes only how long implementation continues before reporting back; it does not weaken any file, pass, batch, empirical, or scientific validation requirement.
 
 ---
 
@@ -996,7 +1017,8 @@ Implementation may begin only if this build plan passes the following audit.
 - The project uses one Python package, one build configuration, one CLI framework, one plugin registry, and one test runner.
 - No speculative infrastructure is required.
 - Files are created only when their responsibility is implemented.
-- No implementation pass exceeds three repository files.
+- No internal implementation pass exceeds three repository files.
+- No single user directive advances through more than two fully gated batches.
 
 ### Completeness
 
@@ -1016,7 +1038,7 @@ Implementation may begin only if this build plan passes the following audit.
 - No unverified equation or tolerance is scheduled for implementation.
 - Built-in scientific methods require authoritative definitions and independent validation.
 
-If every answer is yes, implementation begins with the first pass in Batch 0, respecting the three-file maximum and the targeted/check/regression sequence above.
+If every answer is yes, implementation begins with the first internal pass in the active batch, respecting the three-file maximum and the targeted/check/regression sequence. A second batch may be entered under the same user directive only after the first batch is fully gated and closed.
 
 ---
 
@@ -1037,4 +1059,4 @@ BUILD_PLAN.md
 
 No additional planning Markdown file is required before coding.
 
-The next action after approval is not more architecture documentation. It is implementation under the three-file pass rule, beginning with the next incomplete files in the active batch and preserving the audit/test gates above.
+The next action after approval is not more architecture documentation. It is implementation under the **up-to-two-fully-gated-batches-per-directive** rule while retaining the **three-file internal pass maximum**, beginning with the next incomplete files in the active batch and preserving every existing audit/test gate above.
