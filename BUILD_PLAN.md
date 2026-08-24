@@ -4,7 +4,7 @@
 **Governing documents:** `DESIGN_CONTRACT.md`, `ARCHITECTURE.md`, `DATA_ENGINEERING.md`, `SCIENTIFIC_MODEL.md`, `API_PLUGIN_CONTRACT.md`, `CLI_CONTRACT.md`, `TEST_VALIDATION_CONTRACT.md`  
 **Repository:** `KNOWDYN/VascuQuest`  
 **Canonical v1 dataset:** Zenodo record `3275625`  
-**Purpose:** Convert the frozen design contracts into a practical, file-by-file implementation sequence that can be built, audited, and tested incrementally without premature technology commitments or scientific drift.
+**Purpose:** Convert the frozen design contracts into a practical, small-pass implementation sequence that can be built, audited, and tested incrementally without premature technology commitments or scientific drift.
 
 ---
 
@@ -25,19 +25,25 @@ The plan optimizes for **correct implementation with low rework**, not maximum f
 
 ---
 
-## 2. Execution rule: one file at a time
+## 2. Execution rule: three files per pass
 
-Implementation proceeds **one repository file at a time**.
+Implementation normally proceeds in **passes of three repository files**.
 
-For each file:
+Three files is the default and maximum pass size. A pass may be reduced to one or two files when a file is scientifically sensitive, empirically gated, unusually coupled, or depends on unresolved behavior. A pass must never exceed three files merely for speed.
 
-1. implement only the responsibility assigned to that file;
-2. inspect the resulting file for contract violations;
-3. run the smallest relevant test/check set;
-4. correct any failure before creating the next file;
-5. commit only after the file is internally coherent with already-created dependencies.
+Within each pass, files are still implemented and checked sequentially rather than generated as an unaudited bundle:
+
+1. choose up to three files that are next in the approved batch order and are compatible to implement together;
+2. implement only the responsibility assigned to the first file;
+3. inspect that file for contract violations and run its smallest relevant targeted checks before proceeding;
+4. repeat the same implementation/audit/check cycle for the second and third files;
+5. if any file fails, stop adding files to the pass, correct the failure, and re-test before continuing;
+6. after the pass files individually pass, run the relevant combined regression tests for the whole pass;
+7. commit only when the pass is internally coherent with already-created dependencies and no known failure is hidden.
 
 A later file may reveal a defect in an earlier file. In that case the earlier file is amended and re-tested before implementation continues.
+
+Tests are part of implementation, not deferred cleanup. When a direct test lives in a separate repository file, it may count as one of the three files in that pass or be included in the immediately following pass, provided the production file is not treated as batch-complete before its required test exists and passes.
 
 No batch is considered complete merely because all planned files exist.
 
@@ -319,7 +325,7 @@ No CLI, scientific model, or data reader is implemented in this batch.
 6. `domain/cohort.py`
 7. `domain/result.py`
 8. `domain/__init__.py`
-9. corresponding unit tests file-by-file
+9. corresponding unit tests, grouped so each completed implementation is test-backed within the same or immediately following three-file pass
 
 ### Responsibilities
 
@@ -926,9 +932,9 @@ If the authoritative material is insufficient to implement a method unambiguousl
 
 ---
 
-## 30. Build audit after every batch
+## 30. Build audit after every pass and batch
 
-At each batch boundary, audit five questions:
+At each three-file pass boundary, audit five questions:
 
 1. **Contract fidelity:** Does the implementation still satisfy all governing Markdown contracts?
 2. **Simplicity:** Did we add machinery not required by a current acceptance scenario?
@@ -936,7 +942,9 @@ At each batch boundary, audit five questions:
 4. **Feasibility:** Does the implementation work with realistic local resources and supported platforms?
 5. **Scientific fidelity:** Did any parser/service/API choice alter scientific meaning, units, evidence, provenance, or mathematics?
 
-A "no" answer blocks progression.
+A "no" answer blocks the next pass.
+
+At each batch boundary, repeat the same audit over the cumulative batch and apply the batch exit gate in addition to the pass-level audit.
 
 ---
 
@@ -946,12 +954,14 @@ Use small commits aligned with completed responsibilities.
 
 Recommended commit scale:
 
-- one coherent implementation file plus its direct tests; or
-- one tightly coupled resource/test update when splitting would leave the repository invalid.
+- one completed three-file pass whose files belong to one coherent implementation responsibility and whose required targeted/regression tests pass; or
+- a reduced one- or two-file pass when scientific sensitivity, empirical gating, dependency order, or failure correction makes three files unsafe.
 
-Do not combine unrelated architectural layers in one commit merely to reduce commit count.
+Direct tests may be committed with the production files they validate or in the immediately following pass, but no batch may close with required direct tests missing.
 
-Do not rewrite the governing contracts during implementation unless a genuine contradiction is discovered. Such a change requires an explicit reviewed contract amendment before code proceeds under the new rule.
+Do not combine unrelated architectural layers in one commit merely to reach three files or reduce commit count.
+
+Do not rewrite the governing contracts during implementation unless a genuine contradiction is discovered or the user explicitly approves a process amendment. Such a change must be reviewed before code proceeds under the new rule.
 
 ---
 
@@ -960,11 +970,12 @@ Do not rewrite the governing contracts during implementation unless a genuine co
 To maximize the amount that can be completed correctly in one working session:
 
 1. prioritize deterministic local code and small-source functionality first;
-2. run targeted tests immediately after each file rather than accumulating failures;
-3. avoid optional feature work before the core vertical slice passes;
-4. perform real-data acquisition only when the next implementation decision actually depends on it;
-5. do not download the complete 44.3 GB merely for development convenience;
-6. separate code completion from full-dataset release validation when data-transfer/runtime constraints make Tier 4 impractical in the same environment.
+2. work in passes of at most three files, running the smallest relevant targeted checks after each file and a combined regression check after each pass;
+3. stop a pass immediately when a file exposes a contract, scientific, or test failure, and resolve that failure before adding another file;
+4. avoid optional feature work before the core vertical slice passes;
+5. perform real-data acquisition only when the next implementation decision actually depends on it;
+6. do not download the complete 44.3 GB merely for development convenience;
+7. separate code completion from full-dataset release validation when data-transfer/runtime constraints make Tier 4 impractical in the same environment.
 
 The package must never claim a validation state that was not actually executed.
 
@@ -985,6 +996,7 @@ Implementation may begin only if this build plan passes the following audit.
 - The project uses one Python package, one build configuration, one CLI framework, one plugin registry, and one test runner.
 - No speculative infrastructure is required.
 - Files are created only when their responsibility is implemented.
+- No implementation pass exceeds three repository files.
 
 ### Completeness
 
@@ -1004,7 +1016,7 @@ Implementation may begin only if this build plan passes the following audit.
 - No unverified equation or tolerance is scheduled for implementation.
 - Built-in scientific methods require authoritative definitions and independent validation.
 
-If every answer is yes, implementation begins with **Batch 0, file 1: `pyproject.toml`**.
+If every answer is yes, implementation begins with the first pass in Batch 0, respecting the three-file maximum and the targeted/check/regression sequence above.
 
 ---
 
@@ -1025,4 +1037,4 @@ BUILD_PLAN.md
 
 No additional planning Markdown file is required before coding.
 
-The next action after approval is not more architecture documentation. It is implementation of `pyproject.toml`, followed by its audit and tests before the next repository file is created.
+The next action after approval is not more architecture documentation. It is implementation under the three-file pass rule, beginning with the next incomplete files in the active batch and preserving the audit/test gates above.
