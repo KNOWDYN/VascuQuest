@@ -11,7 +11,13 @@ from collections.abc import Mapping
 
 from vascuquest._version import __version__
 from vascuquest.domain.cohort import Cohort
-from vascuquest.domain.location import VascularLocation
+from vascuquest.domain.evidence import EvidenceClass
+from vascuquest.domain.location import (
+    MeasurementSite,
+    PathPosition,
+    SegmentLocation,
+    VascularLocation,
+)
 from vascuquest.domain.result import ScientificResult
 from vascuquest.errors import AdmissibilityError, CapabilityError
 from vascuquest.plugins.descriptor import ComponentKind
@@ -24,6 +30,7 @@ from vascuquest.ports.methods import (
     ParameterSpec,
     ResearchOperator,
 )
+from vascuquest.schema import CanonicalSchema, load_canonical_schema
 
 from .retrieval import QuantitySubjects, RetrievalService
 
@@ -31,15 +38,25 @@ from .retrieval import QuantitySubjects, RetrievalService
 class ExecutionService:
     """Resolve and execute only registered, protocol-valid scientific components."""
 
-    __slots__ = ("_registry", "_retrieval")
+    __slots__ = ("_registry", "_retrieval", "_schema")
 
-    def __init__(self, registry: PluginRegistry, retrieval: RetrievalService) -> None:
+    def __init__(
+        self,
+        registry: PluginRegistry,
+        retrieval: RetrievalService,
+        *,
+        schema: CanonicalSchema | None = None,
+    ) -> None:
         if not isinstance(registry, PluginRegistry):
             raise TypeError("registry must be a PluginRegistry")
         if not isinstance(retrieval, RetrievalService):
             raise TypeError("retrieval must be a RetrievalService")
+        resolved_schema = load_canonical_schema() if schema is None else schema
+        if not isinstance(resolved_schema, CanonicalSchema):
+            raise TypeError("schema must be a CanonicalSchema")
         self._registry = registry
         self._retrieval = retrieval
+        self._schema = resolved_schema
 
     def derive(
         self,
@@ -148,7 +165,7 @@ class ExecutionService:
                     subjects=subjects,
                     location=location,
                 )
-            _validate_requirement(requirement, result)
+            _validate_requirement(requirement, result, self._schema)
             resolved[requirement.name] = result
         return resolved
 
@@ -156,7 +173,7 @@ class ExecutionService:
     def _validate_output(
         result: object,
         *,
-        expected_evidence: object | None,
+        expected_evidence: EvidenceClass | None,
     ) -> ScientificResult:
         if not isinstance(result, ScientificResult):
             raise AdmissibilityError("scientific component did not return a ScientificResult")
@@ -195,9 +212,20 @@ def _normalize_parameters(
     return normalized
 
 
+def _location_kind(result: ScientificResult) -> str | None:
+    if isinstance(result.location, MeasurementSite):
+        return "site"
+    if isinstance(result.location, SegmentLocation):
+        return "segment"
+    if isinstance(result.location, PathPosition):
+        return "path_position"
+    return None
+
+
 def _validate_requirement(
     requirement: InputRequirement,
     result: ScientificResult,
+    schema: CanonicalSchema,
 ) -> None:
     if not isinstance(result, ScientificResult):
         raise AdmissibilityError(f"input {requirement.name!r} is not a ScientificResult")
@@ -209,6 +237,18 @@ def _validate_requirement(
             f"input {requirement.name!r} requires quantity {requirement.quantity!r}, "
             f"received {result.quantity.canonical_name!r}"
         )
+    if requirement.category is not None:
+        try:
+            actual_category = schema.quantity_schema(result.quantity.canonical_name).category
+        except KeyError as exc:
+            raise AdmissibilityError(
+                f"input {requirement.name!r} uses a quantity absent from the active canonical schema"
+            ) from exc
+        if actual_category != requirement.category:
+            raise AdmissibilityError(
+                f"input {requirement.name!r} requires category {requirement.category!r}, "
+                f"received {actual_category!r}"
+            )
     if (
         requirement.physical_dimension is not None
         and result.quantity.physical_dimension != requirement.physical_dimension
@@ -221,6 +261,8 @@ def _validate_requirement(
         and result.quantity.canonical_unit not in requirement.accepted_units
     ):
         raise AdmissibilityError(f"input {requirement.name!r} has incompatible canonical unit")
+    if requirement.location_kind is not None and _location_kind(result) != requirement.location_kind:
+        raise AdmissibilityError(f"input {requirement.name!r} has incompatible location kind")
     if requirement.cohort_required and result.cohort is None:
         raise AdmissibilityError(f"input {requirement.name!r} requires cohort context")
     if requirement.accepted_evidence and result.evidence not in requirement.accepted_evidence:
