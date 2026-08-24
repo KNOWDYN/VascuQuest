@@ -1,0 +1,122 @@
+{
+  "schema_version": "1",
+  "dataset_family": "PWDB",
+  "canonical_record_id": "3275625",
+  "canonical_doi": "10.5281/zenodo.3275625",
+  "allowed_categories": [
+    "haemodynamic_parameter",
+    "pulse_wave_index",
+    "onset_or_fiducial_time",
+    "model_parameter",
+    "geometry_parameter",
+    "waveform_signal"
+  ],
+  "allowed_location_contexts": [
+    "measurement_site",
+    "path_position"
+  ],
+  "quantities": [
+    {
+      "canonical_name": "pressure",
+      "label": "Pressure",
+      "description": "Arterial pressure waveform signal.",
+      "value_kind": "numeric",
+      "physical_dimension": "pressure",
+      "canonical_unit": "mmHg",
+      "allowed_source_units": ["mmHg"],
+      "applicable_contexts": ["measurement_site", "path_position"],
+      "source_aliases": ["P"],
+      "default_evidence": "SOURCE",
+      "known_source_issues": [],
+      "citations": ["doi:10.1152/ajpheart.00218.2019"],
+      "category": "waveform_signal",
+      "source_mappings": [
+        {
+          "source_scope": "common_site_waveforms",
+          "source_field": "P",
+          "source_unit": "mmHg",
+          "canonical_unit": "mmHg"
+        }
+      ]
+    },
+    {
+      "canonical_name": "flow_velocity",
+      "label": "Flow velocity",
+      "description": "Arterial blood flow-velocity waveform signal.",
+      "value_kind": "numeric",
+      "physical_dimension": "velocity",
+      "canonical_unit": "m/s",
+      "allowed_source_units": ["m/s"],
+      "applicable_contexts": ["measurement_site", "path_position"],
+      "source_aliases": ["U"],
+      "default_evidence": "SOURCE",
+      "known_source_issues": [],
+      "citations": ["doi:10.1152/ajpheart.00218.2019"],
+      "category": "waveform_signal",
+      "source_mappings": [
+        {
+          "source_scope": "common_site_waveforms",
+          "source_field": "U",
+          "source_unit": "m/s",
+          "canonical_unit": "m/s"
+        }
+      ]
+    },
+    {
+      "canonical_name": "luminal_area",
+      "label": "Luminal area",
+      "description": "Arterial luminal cross-sectional area waveform signal.",
+      "value_kind": "numeric",
+      "physical_dimension": "area",
+      "canonical_unit": "m^2",
+      "allowed_source_units": ["m^2"],
+      "applicable_contexts": ["measurement_site", "path_position"],
+      "source_aliases": ["A"],
+      "default_evidence": "SOURCE",
+      "known_source_issues": ["pwdb_mat_metadata_area_unit"],
+      "citations": ["doi:10.1152/ajpheart.00218.2019"],
+      "category": "waveform_signal",
+      "source_mappings": [
+        {
+          "source_scope": "common_site_waveforms",
+          "source_field": "A",
+          "source_unit": "m^2",
+          "canonical_unit": "m^2"
+        }
+      ],
+      "source_defects": [
+        {
+          "issue_id": "pwdb_mat_metadata_area_unit",
+          "source_scope": "PWs_mat_metadata",
+          "source_field": "PWs.units.A",
+          "reported_value": "m3",
+          "canonical_interpretation": "m^2",
+          "status": "upstream_metadata_defect"
+        }
+      ]
+    },
+    {
+      "canonical_name": "photoplethysmogram",
+      "label": "Photoplethysmogram",
+      "description": "Photoplethysmogram waveform signal supplied by the source dataset.",
+      "value_kind": "numeric",
+      "physical_dimension": "dimensionless",
+      "canonical_unit": "au",
+      "allowed_source_units": ["au"],
+      "applicable_contexts": ["measurement_site"],
+      "source_aliases": ["PPG"],
+      "default_evidence": "SOURCE",
+      "known_source_issues": [],
+      "citations": ["doi:10.1152/ajpheart.00218.2019"],
+      "category": "waveform_signal",
+      "source_mappings": [
+        {
+          "source_scope": "common_site_waveforms",
+          "source_field": "PPG",
+          "source_unit": "au",
+          "canonical_unit": "au"
+        }
+      ]
+    }
+  ]
+}
