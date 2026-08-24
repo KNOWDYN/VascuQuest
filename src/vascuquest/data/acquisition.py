@@ -22,7 +22,7 @@ from vascuquest.schema import ArtifactManifestEntry, CanonicalManifest, load_man
 from .integrity import verify_artifact
 from .paths import DataPaths
 from .sources import SourceCandidate, SourceKind, SourceRegistry
-from .state import ArtifactState
+from .state import ArtifactInspection, ArtifactState
 
 
 _DEFAULT_CHUNK_SIZE = 1024 * 1024
@@ -37,6 +37,22 @@ def _validate_chunk_size(chunk_size: int) -> None:
         raise TypeError("chunk_size must be an integer")
     if chunk_size <= 0:
         raise ValueError("chunk_size must be positive")
+
+
+def _integrity_failure_message(
+    artifact: ArtifactManifestEntry,
+    inspections: list[ArtifactInspection],
+) -> str:
+    details: list[str] = []
+    for inspection in inspections:
+        observed = inspection.observed_checksum or inspection.state.value
+        details.append(
+            f"{inspection.path}: expected {artifact.checksum_value}, observed {observed}"
+        )
+    return (
+        f"no usable copy of canonical artifact {artifact.artifact_id!r}; "
+        + "; ".join(details)
+    )
 
 
 class ArtifactAcquirer:
@@ -84,6 +100,7 @@ class ArtifactAcquirer:
         self._paths.ensure()
         candidates = self._registry.candidates(artifact, self._paths, offline=offline)
         network_errors: list[str] = []
+        integrity_failures: list[ArtifactInspection] = []
 
         for candidate in candidates:
             if candidate.local_path is not None:
@@ -94,6 +111,17 @@ class ArtifactAcquirer:
                 )
                 if inspection.state is ArtifactState.VERIFIED:
                     return candidate.local_path
+                if inspection.state in {
+                    ArtifactState.CHECKSUM_FAILED,
+                    ArtifactState.UNREADABLE,
+                }:
+                    integrity_failures.append(inspection)
+                    if (
+                        candidate.kind is SourceKind.VERIFIED_CACHE
+                        and inspection.state is ArtifactState.CHECKSUM_FAILED
+                        and candidate.local_path.is_file()
+                    ):
+                        candidate.local_path.unlink()
                 continue
 
             try:
@@ -104,6 +132,8 @@ class ArtifactAcquirer:
                 network_errors.append(f"{candidate.kind.value}: {exc}")
                 continue
 
+        if integrity_failures:
+            raise IntegrityError(_integrity_failure_message(artifact, integrity_failures))
         if offline:
             raise DatasetUnavailableError(
                 f"canonical artifact {artifact.artifact_id!r} is not available from any "
