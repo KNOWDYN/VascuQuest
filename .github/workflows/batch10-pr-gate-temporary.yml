@@ -5,8 +5,7 @@ on:
     branches: [main]
     paths:
       - 'src/**'
-      - 'tests/contracts/test_batch10_public_surface.py'
-      - 'tests/integration/test_core_api.py'
+      - 'tests/**'
       - 'pyproject.toml'
       - '.github/workflows/batch10-pr-gate-temporary.yml'
   workflow_dispatch:
@@ -28,5 +27,7 @@ jobs:
           cache: 'pip'
       - name: Install package and test dependency
         run: python -m pip install -e . pytest
-      - name: Run Batch 10 contract and integration gate
+      - name: Run Batch 10 targeted gate
         run: python -m pytest -q tests/contracts/test_batch10_public_surface.py tests/integration/test_core_api.py
+      - name: Run cumulative non-full-data regression suite
+        run: python -m pytest -q --ignore=tests/full_data
