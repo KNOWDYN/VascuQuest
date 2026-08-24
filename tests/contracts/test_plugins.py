@@ -34,9 +34,10 @@ def _descriptor(
     *,
     protocol_version: int = SUPPORTED_PROTOCOL_VERSION,
 ) -> ComponentDescriptor:
+    display_name = qualified_id.split(":", 1)[1] if ":" in qualified_id else qualified_id
     return ComponentDescriptor(
         kind=kind,
-        name=qualified_id.split(":", 1)[1],
+        name=display_name,
         qualified_id=qualified_id,
         implementation_version="1.2.3",
         protocol_version=protocol_version,
