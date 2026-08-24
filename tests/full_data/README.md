@@ -37,7 +37,7 @@ wfdb >=4.3,<5
 
 They remain spike dependencies rather than newly declared mandatory package dependencies until the empirical results justify the final packaging choice.
 
-## Running the gate
+## Running the gate with existing canonical files
 
 From the repository root, with the six exact canonical files in one local directory:
 
@@ -47,6 +47,19 @@ python tests/full_data/pwdb3275625_ingestion_spike.py /path/to/pwdb3275625 \
 ```
 
 Exit code `0` and report status `"passed"` are required before Batch 8 can close.
+
+## Online acquisition and gate runner
+
+On a networked machine without pre-existing files, use the repository-native runner:
+
+```bash
+python tests/full_data/run_online_pwdb3275625_ingestion_spike.py /path/to/spike-workspace \
+  --report pwdb3275625_ingestion_spike_report.json
+```
+
+This runner deliberately uses VascuQuest's own `ArtifactAcquirer` rather than a second download implementation. It acquires only the six required artifacts from the canonical manifest, streams each download into incomplete work state, checksum-verifies it, atomically promotes verified files into the managed source cache, and then invokes the Tier-3 harness. Re-running the command reuses already verified cache files.
+
+The acquisition layer does not claim HTTP range/resume support, and the online runner does not add or imply such a capability. A network interruption during the multi-gigabyte artifact therefore requires that artifact's download to restart; this limitation remains explicit until a later empirically justified change.
 
 The report records:
 
@@ -69,6 +82,8 @@ The report records:
 The live Zenodo record `https://zenodo.org/records/3275625` identifies the canonical dataset as DOI `10.5281/zenodo.3275625`, reports the 44.3 GB file set, and exposes the checksums represented in the VascuQuest manifest.
 
 The Zenodo preview of `PWs_csv.zip` exposes the expected common-site CSV naming layout, while the `geo.zip` preview exposes subject-specific `pwdb_geo_####.csv` members. These observations support the spike harness, but they are not treated as Tier-3 substitutes for reading checksum-verified local artifacts.
+
+The authoritative upstream exporter also establishes that WFDB records use the `pwdb####` subject naming convention; path data are assembled as `data.path_waves.<path>(sim_no).<signal>{position}` with distance metadata; and oversized path exports are saved using MATLAB `-v7.3`. These facts are used to design the empirical reader checks, not to replace them.
 
 ## Hard boundary
 
