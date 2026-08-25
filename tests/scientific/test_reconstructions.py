@@ -51,6 +51,7 @@ def _waveform(
         location=SITE,
         evidence=evidence,
         validity=validity,
+        method_id=None if evidence is EvidenceClass.SOURCE else "tests:fixture",
         missing_mask=missing_mask,
         padding_mask=padding_mask,
     )
