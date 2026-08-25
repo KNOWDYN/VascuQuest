@@ -2,9 +2,6 @@ name: Core release validation
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - build/batch-15-core-release-validation
 
 permissions:
   contents: read
