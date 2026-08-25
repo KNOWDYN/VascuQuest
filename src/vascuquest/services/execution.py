@@ -12,13 +12,16 @@ from collections.abc import Mapping
 from vascuquest._version import __version__
 from vascuquest.domain.cohort import Cohort
 from vascuquest.domain.evidence import EvidenceClass
+from vascuquest.domain.identity import SubjectKey
 from vascuquest.domain.location import (
     MeasurementSite,
     PathPosition,
     SegmentLocation,
     VascularLocation,
 )
+from vascuquest.domain.quantity import QuantityDefinition
 from vascuquest.domain.result import ScientificResult
+from vascuquest.domain.subject import VirtualSubject
 from vascuquest.errors import AdmissibilityError, CapabilityError
 from vascuquest.plugins.descriptor import ComponentKind
 from vascuquest.plugins.registry import PluginRegistry
@@ -82,7 +85,11 @@ class ExecutionService:
             parameters=normalized,
             context=ExecutionContext(runtime_version=__version__),
         )
-        return self._validate_output(result, expected_evidence=component.output_evidence)
+        return self._validate_output(
+            result,
+            expected_evidence=component.output_evidence,
+            expected_quantity=component.output_quantity,
+        )
 
     def model(
         self,
@@ -108,7 +115,11 @@ class ExecutionService:
             parameters=normalized,
             context=ExecutionContext(runtime_version=__version__),
         )
-        return self._validate_output(result, expected_evidence=component.output_evidence)
+        return self._validate_output(
+            result,
+            expected_evidence=component.output_evidence,
+            expected_quantity=None,
+        )
 
     def discover(
         self,
@@ -136,7 +147,11 @@ class ExecutionService:
             parameters=normalized,
             context=ExecutionContext(runtime_version=__version__),
         )
-        return self._validate_output(result, expected_evidence=None)
+        return self._validate_output(
+            result,
+            expected_evidence=None,
+            expected_quantity=None,
+        )
 
     def _resolve_inputs(
         self,
@@ -155,13 +170,8 @@ class ExecutionService:
         for requirement in requirements:
             result = supplied.get(requirement.name)
             if result is None:
-                if requirement.quantity is None:
-                    raise CapabilityError(
-                        f"input {requirement.name!r} must be supplied explicitly because "
-                        "its requirement is category-based"
-                    )
-                result = self._retrieval.get(
-                    requirement.quantity,
+                result = self._resolve_declared_input(
+                    requirement,
                     subjects=subjects,
                     location=location,
                 )
@@ -169,17 +179,63 @@ class ExecutionService:
             resolved[requirement.name] = result
         return resolved
 
+    def _resolve_declared_input(
+        self,
+        requirement: InputRequirement,
+        *,
+        subjects: QuantitySubjects,
+        location: VascularLocation | None,
+    ) -> ScientificResult:
+        if requirement.quantity is None:
+            raise CapabilityError(
+                f"input {requirement.name!r} must be supplied explicitly because "
+                "its requirement is category-based"
+            )
+
+        try:
+            quantity_schema = self._schema.quantity_schema(requirement.quantity)
+        except KeyError as exc:
+            raise CapabilityError(
+                f"declared input quantity {requirement.quantity!r} is absent from the active schema"
+            ) from exc
+
+        if quantity_schema.category != "waveform_signal":
+            return self._retrieval.get(
+                requirement.quantity,
+                subjects=subjects,
+                location=location,
+            )
+
+        if not isinstance(subjects, (str, SubjectKey, VirtualSubject)):
+            raise CapabilityError(
+                f"waveform input {requirement.name!r} requires exactly one virtual subject"
+            )
+        if location is None:
+            raise CapabilityError(
+                f"waveform input {requirement.name!r} requires an explicit vascular location"
+            )
+        return self._retrieval.waveform(
+            requirement.quantity,
+            subject=subjects,
+            location=location,
+        )
+
     @staticmethod
     def _validate_output(
         result: object,
         *,
         expected_evidence: EvidenceClass | None,
+        expected_quantity: QuantityDefinition | None,
     ) -> ScientificResult:
         if not isinstance(result, ScientificResult):
             raise AdmissibilityError("scientific component did not return a ScientificResult")
         if expected_evidence is not None and result.evidence is not expected_evidence:
             raise AdmissibilityError(
                 "scientific component output evidence does not match its declared evidence class"
+            )
+        if expected_quantity is not None and result.quantity != expected_quantity:
+            raise AdmissibilityError(
+                "scientific component output quantity does not match its declared output quantity"
             )
         return result
 
@@ -214,7 +270,7 @@ def _normalize_parameters(
 
 def _location_kind(result: ScientificResult) -> str | None:
     if isinstance(result.location, MeasurementSite):
-        return "site"
+        return "measurement_site"
     if isinstance(result.location, SegmentLocation):
         return "segment"
     if isinstance(result.location, PathPosition):

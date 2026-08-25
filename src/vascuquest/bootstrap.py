@@ -8,6 +8,7 @@ from vascuquest.api import DatasetSession
 from vascuquest.backends.pwdb3275625 import PWDB3275625Backend
 from vascuquest.data import ArtifactAcquirer, DataPaths, SourceRegistry
 from vascuquest.errors import DatasetUnavailableError
+from vascuquest.methods import BUILTIN_DERIVATION_FACTORIES
 from vascuquest.plugins.descriptor import ComponentKind
 from vascuquest.plugins.registry import PluginRegistry
 from vascuquest.ports.backend import DatasetBackend
@@ -38,7 +39,11 @@ def _compose_session(
     datasets = DatasetService(backend, schema=resolved_schema)
     selection = SelectionService(backend)
     retrieval = RetrievalService(backend, selection)
-    execution = ExecutionService(resolved_registry, retrieval)
+    execution = ExecutionService(
+        resolved_registry,
+        retrieval,
+        schema=resolved_schema,
+    )
     exporting = ExportingService(resolved_registry)
     reproduction = ReproductionService(
         retrieval,
@@ -53,6 +58,15 @@ def _compose_session(
         exporting=exporting,
         reproduction=reproduction,
     )
+
+
+def _register_builtin_derivations(registry: PluginRegistry) -> None:
+    for factory in BUILTIN_DERIVATION_FACTORIES:
+        registry.register_factory(
+            factory,
+            expected_kind=ComponentKind.DERIVATION,
+            built_in=True,
+        )
 
 
 def open_dataset(
@@ -90,6 +104,7 @@ def open_dataset(
         expected_kind=ComponentKind.BACKEND,
         built_in=True,
     )
+    _register_builtin_derivations(plugins)
     plugins.discover_installed()
     return _compose_session(backend, registry=plugins)
 
