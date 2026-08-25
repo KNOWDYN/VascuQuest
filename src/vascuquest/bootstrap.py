@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from vascuquest.api import DatasetSession
-from vascuquest.backends.pwdb3275625 import PWDB3275625Backend
+from vascuquest.backends.pwdb3275625.path_backend import PWDB3275625PathBackend
 from vascuquest.data import ArtifactAcquirer, DataPaths, SourceRegistry
 from vascuquest.errors import DatasetUnavailableError
 from vascuquest.exporters import BUILTIN_EXPORTER_FACTORIES
@@ -107,7 +107,7 @@ def open_dataset(
         registry.register_local(source_path)
 
     acquirer = ArtifactAcquirer(paths, registry)
-    backend = PWDB3275625Backend.from_acquirer(acquirer, offline=offline)
+    backend = PWDB3275625PathBackend.from_acquirer(acquirer, offline=offline)
     plugins = PluginRegistry()
     plugins.register_factory(
         lambda: backend,
