@@ -13,9 +13,9 @@ def test_public_plugin_catalog_exposes_builtin_backend_without_data_access():
     assert descriptor in vq.plugins.list(ComponentKind.BACKEND)
 
 
-def test_open_dataset_status_keeps_path_capability_explicitly_deferred():
+def test_open_dataset_status_advertises_batch9_path_backend_without_data_access():
     session = vq.open_dataset(offline=True)
     status = session.status()
     assert status.identity.record_id == "3275625"
-    assert status.path_resolved_supported is False
-    assert status.path_validation_state == "unavailable_pending_batch8_tier3_validation"
+    assert status.path_resolved_supported is True
+    assert status.path_validation_state == "validated_and_available"
