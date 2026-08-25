@@ -14,11 +14,6 @@ jobs:
     name: PWDB core Tier-4 / Python 3.12
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    env:
-      XDG_DATA_HOME: ${{ runner.temp }}/vascuquest-xdg/data
-      XDG_CACHE_HOME: ${{ runner.temp }}/vascuquest-xdg/cache
-      XDG_STATE_HOME: ${{ runner.temp }}/vascuquest-xdg/state
-      VQ_REPORT: ${{ runner.temp }}/vascuquest-core-release-validation.json
 
     steps:
       - name: Checkout release candidate
@@ -36,17 +31,21 @@ jobs:
         run: python -m pip install .
 
       - name: Run real-source core Tier-4 validation
-        run: >-
-          python tests/full_data/core_release_validation.py
-          --report "$VQ_REPORT"
-          --code-revision "${{ github.sha }}"
-          --repo-root .
+        shell: bash
+        run: |
+          export XDG_DATA_HOME="$RUNNER_TEMP/vascuquest-xdg/data"
+          export XDG_CACHE_HOME="$RUNNER_TEMP/vascuquest-xdg/cache"
+          export XDG_STATE_HOME="$RUNNER_TEMP/vascuquest-xdg/state"
+          python tests/full_data/core_release_validation.py \
+            --report core-release-validation.json \
+            --code-revision "${{ github.sha }}" \
+            --repo-root .
 
       - name: Upload machine-readable validation report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: vascuquest-core-release-validation
-          path: ${{ env.VQ_REPORT }}
+          path: core-release-validation.json
           if-no-files-found: error
           retention-days: 90
