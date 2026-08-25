@@ -200,10 +200,17 @@ def _size_summary(artifacts: tuple[object, ...]) -> str:
     return f"{total} bytes"
 
 
+def _prompt_is_interactive() -> bool:
+    try:
+        return bool(sys.stdin.isatty() and sys.stderr.isatty())
+    except (AttributeError, OSError, ValueError):
+        return False
+
+
 def _confirm_destructive_or_large(message: str, *, yes: bool) -> None:
     if yes:
         return
-    if not sys.stdin.isatty():
+    if not _prompt_is_interactive():
         raise typer.BadParameter(f"{message}; non-interactive execution requires --yes")
     if not typer.confirm(f"{message}. Continue?", default=False, abort=False, err=True):
         raise typer.Abort()
