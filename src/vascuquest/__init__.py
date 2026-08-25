@@ -1,11 +1,23 @@
-"""Top-level public surface for VascuQuest.
+"""Stable public Python surface for VascuQuest core v1."""
 
-Only stable, dependency-light symbols are exposed at import time during the
-initial implementation stage. Dataset sessions and other research-facing API
-objects will be added here only when their implementation batches are complete.
-"""
-
+from . import plugins as plugins
 from ._version import __version__
+from .api import DatasetSession
+from .bootstrap import open_dataset, register_source
+from .domain import (
+    Cohort,
+    DatasetIdentity,
+    EvidenceClass,
+    MeasurementSite,
+    PathPosition,
+    QuantityDefinition,
+    ScientificResult,
+    SegmentLocation,
+    SubjectKey,
+    VascularLocation,
+    VirtualSubject,
+    Waveform,
+)
 from .errors import (
     AdmissibilityError,
     CapabilityError,
@@ -21,20 +33,38 @@ from .errors import (
     VascuQuestError,
     VascuQuestInternalError,
 )
+from .provenance import ProvenanceRecord
 
 __all__ = [
     "AdmissibilityError",
     "CapabilityError",
+    "Cohort",
+    "DatasetIdentity",
+    "DatasetSession",
     "DatasetUnavailableError",
+    "EvidenceClass",
     "IntegrityError",
+    "MeasurementSite",
     "NumericalMethodError",
+    "PathPosition",
     "PluginCompatibilityError",
     "PluginError",
+    "ProvenanceRecord",
+    "QuantityDefinition",
     "ReproducibilityError",
     "SchemaError",
+    "ScientificResult",
+    "SegmentLocation",
     "SelectionError",
+    "SubjectKey",
     "UnitError",
+    "VascularLocation",
     "VascuQuestError",
     "VascuQuestInternalError",
+    "VirtualSubject",
+    "Waveform",
     "__version__",
+    "open_dataset",
+    "plugins",
+    "register_source",
 ]
