@@ -32,20 +32,7 @@ The validation then performs:
 
 The deterministic geometry sample is the first, middle and last source subject within each of the six canonical age groups. Expensive waveform numerical parsing is sampled through the public API after every declared waveform file has already undergone exhaustive structural and subject-alignment scanning.
 
-## Explicit exclusions
-
-This core-only Tier-4 gate does **not** validate or claim:
-
-- dense path-resolved waveforms or any path MAT artifact;
-- the complete 44.3 GB PWDB archive;
-- `pwdb_data.mat`;
-- MATLAB or WFDB alternate common-site representations;
-- `model_variations`, which is mapped for future expansion but is not an advertised core capability;
-- plausibility metadata, which is not exposed or claimed by the current core capability/schema.
-
-Path-resolved support remains governed separately by Batch 8 and Batch 9. Synthetic fixtures, common-site data, or this core release gate must never be used as substitutes for the real path-data Tier-3/Tier-4 requirements.
-
-## Execution
+### Core execution
 
 The repository workflow `.github/workflows/core-release-validation.yml` runs this harness separately from ordinary CI and uploads the JSON validation report even when the harness fails.
 
@@ -58,4 +45,61 @@ python tests/full_data/core_release_validation.py \
   --repo-root .
 ```
 
-The run requires network access to the canonical Zenodo record unless the six artifacts are already available in the isolated verified managed cache. A release-critical failure is a hard failure; it must not be converted to `xfail` or silently excluded from the claimed core scope.
+## Batch 8 — Tier-3 path-ingestion gate
+
+`pwdb3275625_ingestion_spike.py` is the mandatory empirical gate before any production path reader is implemented. It is validation tooling, not a backend.
+
+The fresh Batch-8 runner acquires and checksum-verifies these canonical artifacts from Zenodo record `3275625`:
+
+1. `pwdb_model_configs.csv` — explicit subject-index audit;
+2. `geo.zip` — subject-specific geometry audit;
+3. `PWs_csv.zip` — canonical common-site CSV comparison source;
+4. `PWs_wfdb.zip` — required real WFDB inspection and cross-representation comparison;
+5. `pwdb_data.mat` — conventional MATLAB structural inspection;
+6. `pwdb_data_w_aorta_foot_path_p.mat` — real multi-gigabyte path-pressure source.
+
+The decisive path artifact must match canonical MD5 `58a5bfc5eeeb6584652c8238eceba73c` before any path result is accepted.
+
+The Tier-3 harness records:
+
+- canonical checksum and byte size for every required artifact;
+- actual source format/hierarchy and indexing semantics;
+- exact 1..4374 subject alignment where represented;
+- representative geometry structure;
+- real WFDB sampling metadata and CSV-vs-WFDB differences with an absolute tolerance derived from one WFDB ADC quantization step;
+- conventional `pwdb_data.mat` top-level structure without loading the nested dataset into memory;
+- a bounded HDF5/MATLAB-v7.3 read of subject 1 / `aorta_foot` / pressure;
+- path-position/distance cardinality when distance metadata is present;
+- first and repeated bounded-read timings;
+- Linux RSS before/after each bounded path read when available;
+- deterministic repeated numeric identity;
+- explicit lack of HTTP range/resume claims;
+- an evidence-backed `DIRECT`, `INDEXED`, or `CONVERTED` path strategy decision.
+
+A successful bounded direct read does not itself create path support. It only permits Batch 8 to select `DIRECT` as the Batch-9 candidate when the real measurements also show deterministic bounded access and valid path-position alignment. `path_reader.py` remains forbidden until this gate passes.
+
+### Batch-8 local/online execution
+
+When the six canonical artifacts are already present in one verified source directory:
+
+```bash
+python tests/full_data/pwdb3275625_ingestion_spike.py /path/to/source \
+  --report pwdb3275625-tier3-report.json \
+  --code-revision "$(git rev-parse HEAD)"
+```
+
+To acquire the six artifacts through VascuQuest's own acquisition layer and then execute the same gate:
+
+```bash
+python tests/full_data/run_online_pwdb3275625_ingestion_spike.py /path/to/workspace \
+  --report pwdb3275625-tier3-report.json \
+  --code-revision "$(git rev-parse HEAD)"
+```
+
+The validation environment requires `numpy`, `scipy`, `h5py`, and `wfdb`; these are Batch-8 validation dependencies and are not made unconditional core runtime dependencies merely by this gate.
+
+## Explicit scope boundary
+
+The completed core Tier-4 gate does **not** validate or claim dense path-resolved waveforms. Conversely, Batch 8 does not implement production path semantics. Synthetic fixtures, common-site data, exporter source inspection, or source-code assumptions must never substitute for a checksum-verified real path-MAT run.
+
+A Batch-8 failure is a hard empirical failure. It must not be converted to `xfail`, hidden, or used to justify Batch 9. The package remains explicit that path support is unavailable until Batch 8 and Batch 9 pass.
