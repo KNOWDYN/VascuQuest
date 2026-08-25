@@ -35,6 +35,9 @@ dependencies = [
     "typer>=0.27,<1",
 ]
 
+[project.scripts]
+vascuquest = "vascuquest.cli.app:main"
+
 [project.optional-dependencies]
 dev = [
     "build>=1.2",
