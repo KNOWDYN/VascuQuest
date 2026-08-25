@@ -36,11 +36,7 @@ jobs:
           python -m py_compile \
             tests/full_data/pwdb3275625_ingestion_spike.py \
             tests/full_data/pwdb3275625_ingestion_spike_corrected.py \
-            tests/full_data/pwdb3275625_path_strategy_resolution.py \
             tests/full_data/run_online_pwdb3275625_ingestion_spike.py
-
-      - name: Self-test path strategy selector
-        run: python tests/full_data/pwdb3275625_path_strategy_resolution.py --self-test
 
       - name: Install Batch-8 validation environment
         run: |
@@ -59,13 +55,11 @@ jobs:
         if: always()
         run: df -h
 
-      - name: Upload machine-readable Tier-3 reports
+      - name: Upload machine-readable Tier-3 report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: vascuquest-pwdb-tier3-path-ingestion
-          path: |
-            pwdb3275625-tier3-report.json
-            pwdb3275625-tier3-report-path-strategy.json
+          path: pwdb3275625-tier3-report.json
           if-no-files-found: warn
           retention-days: 90
