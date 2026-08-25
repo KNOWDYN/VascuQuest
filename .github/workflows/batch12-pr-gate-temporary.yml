@@ -1,0 +1,28 @@
+name: Batch 12 PR gate (temporary)
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  batch12-exporter-pass:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install package and test dependency
+        run: python -m pip install -e . pytest
+      - name: Run Batch 12 direct exporter gate
+        run: >-
+          python -m pytest -q
+          tests/exporters/test_exporters.py
+          tests/contracts/test_ports.py
+          tests/contracts/test_provenance.py
