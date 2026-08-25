@@ -8,6 +8,7 @@ from vascuquest.api import DatasetSession
 from vascuquest.backends.pwdb3275625 import PWDB3275625Backend
 from vascuquest.data import ArtifactAcquirer, DataPaths, SourceRegistry
 from vascuquest.errors import DatasetUnavailableError
+from vascuquest.exporters import BUILTIN_EXPORTER_FACTORIES
 from vascuquest.methods import BUILTIN_DERIVATION_FACTORIES
 from vascuquest.plugins.descriptor import ComponentKind
 from vascuquest.plugins.registry import PluginRegistry
@@ -69,6 +70,15 @@ def _register_builtin_derivations(registry: PluginRegistry) -> None:
         )
 
 
+def _register_builtin_exporters(registry: PluginRegistry) -> None:
+    for factory in BUILTIN_EXPORTER_FACTORIES:
+        registry.register_factory(
+            factory,
+            expected_kind=ComponentKind.EXPORTER,
+            built_in=True,
+        )
+
+
 def open_dataset(
     dataset: str = "pwdb:3275625",
     *,
@@ -105,6 +115,7 @@ def open_dataset(
         built_in=True,
     )
     _register_builtin_derivations(plugins)
+    _register_builtin_exporters(plugins)
     plugins.discover_installed()
     return _compose_session(backend, registry=plugins)
 
