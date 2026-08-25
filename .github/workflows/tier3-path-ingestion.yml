@@ -35,6 +35,7 @@ jobs:
         run: |
           python -m py_compile \
             tests/full_data/pwdb3275625_ingestion_spike.py \
+            tests/full_data/pwdb3275625_ingestion_spike_corrected.py \
             tests/full_data/run_online_pwdb3275625_ingestion_spike.py
 
       - name: Install Batch-8 validation environment
