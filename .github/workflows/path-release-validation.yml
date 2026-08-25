@@ -1,0 +1,75 @@
+name: Path Tier-4 Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/vascuquest/backends/pwdb3275625/path_*.py'
+      - 'src/vascuquest/bootstrap.py'
+      - 'src/vascuquest/cli/commands.py'
+      - 'src/vascuquest/schema/resources/pwdb3275625_manifest.json'
+      - 'pyproject.toml'
+      - 'tests/full_data/path_release_validation.py'
+      - '.github/workflows/path-release-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: path-tier4-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  canonical-path-artifact:
+    name: ${{ matrix.artifact }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        artifact:
+          - path_aorta_brain
+          - path_aorta_finger
+          - path_aorta_foot_a
+          - path_aorta_foot_p
+          - path_aorta_foot_u
+          - path_aorta_rsubclavian
+    env:
+      XDG_DATA_HOME: ${{ runner.temp }}/vascuquest-tier4/data
+      XDG_CACHE_HOME: ${{ runner.temp }}/vascuquest-tier4/cache
+      XDG_STATE_HOME: ${{ runner.temp }}/vascuquest-tier4/state
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Report storage before validation
+        run: df -h .
+      - name: Install package with path support
+        run: python -m pip install '.[path]'
+      - name: Compile path implementation and validator
+        run: >-
+          python -m py_compile
+          src/vascuquest/backends/pwdb3275625/path_reader.py
+          src/vascuquest/backends/pwdb3275625/path_backend.py
+          tests/full_data/path_release_validation.py
+      - name: Validate canonical path artifact
+        run: >-
+          python tests/full_data/path_release_validation.py
+          --artifact-id '${{ matrix.artifact }}'
+          --report 'reports/${{ matrix.artifact }}.json'
+      - name: Report storage after validation
+        if: always()
+        run: df -h .
+      - name: Upload Tier-4 report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: path-tier4-${{ matrix.artifact }}
+          path: reports/${{ matrix.artifact }}.json
+          if-no-files-found: ignore
+          retention-days: 14
