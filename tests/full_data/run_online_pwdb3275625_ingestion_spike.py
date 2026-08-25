@@ -59,7 +59,7 @@ def main() -> int:
             flush=True,
         )
 
-    spike = Path(__file__).with_name("pwdb3275625_ingestion_spike.py")
+    spike = Path(__file__).with_name("pwdb3275625_ingestion_spike_corrected.py")
     command = [
         sys.executable,
         str(spike),
