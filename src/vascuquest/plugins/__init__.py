@@ -14,6 +14,7 @@ def _public_registry() -> PluginRegistry:
 
     from vascuquest.backends.pwdb3275625 import PWDB3275625Backend
     from vascuquest.errors import DatasetUnavailableError
+    from vascuquest.methods import BUILTIN_DERIVATION_FACTORIES
 
     def unavailable_artifact(artifact_id: str):
         raise DatasetUnavailableError(
@@ -26,6 +27,12 @@ def _public_registry() -> PluginRegistry:
         expected_kind=ComponentKind.BACKEND,
         built_in=True,
     )
+    for factory in BUILTIN_DERIVATION_FACTORIES:
+        registry.register_factory(
+            factory,
+            expected_kind=ComponentKind.DERIVATION,
+            built_in=True,
+        )
     registry.discover_installed()
     return registry
 
