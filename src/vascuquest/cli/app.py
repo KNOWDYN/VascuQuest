@@ -36,7 +36,7 @@ app = typer.Typer(
 )
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def _root(
     version: bool = typer.Option(
         False,
