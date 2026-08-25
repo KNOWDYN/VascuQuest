@@ -84,6 +84,8 @@ def safe_extract_zip(
                 selected = [by_name[name] for name in members]
 
             for info in selected:
+                raw_name = getattr(info, "orig_filename", info.filename)
+                _validate_member_name(raw_name)
                 relative = _validate_member_name(info.filename)
                 if _is_symlink(info):
                     raise IntegrityError(

@@ -275,8 +275,11 @@ def test_zip_path_traversal_and_absolute_members_are_rejected(
     member_name: str,
 ) -> None:
     archive = tmp_path / "malicious.zip"
+    info = zipfile.ZipInfo("placeholder")
+    info.orig_filename = member_name
+    info.filename = member_name
     with zipfile.ZipFile(archive, "w") as handle:
-        handle.writestr(member_name, b"bad")
+        handle.writestr(info, b"bad")
 
     destination = tmp_path / "derived"
     with pytest.raises(IntegrityError):
