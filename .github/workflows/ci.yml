@@ -2,7 +2,7 @@ name: Core CI
 
 on:
   push:
-    branches: [main, build/batch-15-core-release-validation]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -92,40 +92,3 @@ jobs:
           .venv-wheel/bin/python -c "import vascuquest; print(vascuquest.__version__)"
           .venv-wheel/bin/python -m vascuquest --version
           .venv-wheel/bin/vascuquest --version
-
-  batch15-core-tier4:
-    if: github.head_ref == 'build/batch-15-core-release-validation' || github.ref_name == 'build/batch-15-core-release-validation'
-    name: Batch 15 real-source core Tier-4
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    env:
-      XDG_DATA_HOME: ${{ runner.temp }}/vascuquest-xdg/data
-      XDG_CACHE_HOME: ${{ runner.temp }}/vascuquest-xdg/cache
-      XDG_STATE_HOME: ${{ runner.temp }}/vascuquest-xdg/state
-      VQ_REPORT: ${{ runner.temp }}/vascuquest-core-release-validation.json
-    steps:
-      - name: Checkout Batch 15 release candidate
-        uses: actions/checkout@v7
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.12'
-      - name: Compile release-validation harness
-        run: python -m py_compile tests/full_data/core_release_validation.py
-      - name: Install release candidate
-        run: python -m pip install .
-      - name: Run real-source core Tier-4 validation
-        shell: bash
-        run: |
-          python tests/full_data/core_release_validation.py \
-            --report "$VQ_REPORT" \
-            --code-revision "${{ github.event.pull_request.head.sha || github.sha }}" \
-            --repo-root .
-      - name: Upload machine-readable validation report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: vascuquest-core-release-validation
-          path: ${{ env.VQ_REPORT }}
-          if-no-files-found: error
-          retention-days: 90
