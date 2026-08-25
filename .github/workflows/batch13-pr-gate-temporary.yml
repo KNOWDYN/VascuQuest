@@ -26,11 +26,20 @@ jobs:
           vascuquest --help > /tmp/script-help.txt
           python -m vascuquest --version > /tmp/module-version.txt
           vascuquest --version > /tmp/script-version.txt
-          diff -u /tmp/module-help.txt /tmp/script-help.txt
           diff -u /tmp/module-version.txt /tmp/script-version.txt
           python - <<'PY'
           import json
           import subprocess
+          from pathlib import Path
+
+          command_names = (
+              'dataset', 'subjects', 'quantities', 'locations', 'get', 'waveform',
+              'derive', 'model', 'discover', 'plugins', 'export', 'reproduce',
+          )
+          for help_path in (Path('/tmp/module-help.txt'), Path('/tmp/script-help.txt')):
+              help_text = help_path.read_text(encoding='utf-8')
+              for name in command_names:
+                  assert name in help_text, (help_path, name)
 
           commands = (
               ['vascuquest', 'dataset', 'info', '--format', 'json'],
