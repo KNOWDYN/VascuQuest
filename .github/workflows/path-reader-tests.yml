@@ -1,6 +1,8 @@
 name: Path Reader Tests
 
 on:
+  push:
+    branches: [build/batch-9-production-path-reader]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -40,9 +42,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      XDG_DATA_HOME: ${{ runner.temp }}/vascuquest-tier4/data
-      XDG_CACHE_HOME: ${{ runner.temp }}/vascuquest-tier4/cache
-      XDG_STATE_HOME: ${{ runner.temp }}/vascuquest-tier4/state
       PYTHONUNBUFFERED: '1'
     steps:
       - name: Checkout
@@ -57,6 +56,10 @@ jobs:
       - name: Compile Tier-4 validator
         run: python -m py_compile tests/full_data/path_release_validation.py
       - name: Validate all six canonical path artifacts without full downloads
+        env:
+          XDG_DATA_HOME: ${{ runner.temp }}/vascuquest-tier4/data
+          XDG_CACHE_HOME: ${{ runner.temp }}/vascuquest-tier4/cache
+          XDG_STATE_HOME: ${{ runner.temp }}/vascuquest-tier4/state
         run: |
           set -euo pipefail
           for artifact in \
