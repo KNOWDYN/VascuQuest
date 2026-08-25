@@ -58,3 +58,5 @@ jobs:
           PY
       - name: Run targeted Batch 13 CLI tests
         run: python -m pytest -q tests/cli
+      - name: Run cumulative non-full-data regression suite
+        run: python -m pytest -q tests
