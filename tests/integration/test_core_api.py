@@ -143,12 +143,12 @@ def fake_session():
     return _compose_session(backend, registry=registry), backend
 
 
-def test_open_dataset_is_lightweight_and_reports_path_deferred():
+def test_open_dataset_is_lightweight_and_advertises_path_backend_without_source_access():
     session = vq.open_dataset(offline=True)
     assert session.identity.record_id == "3275625"
     status = session.status()
-    assert status.path_resolved_supported is False
-    assert status.path_validation_state == "unavailable_pending_batch8_tier3_validation"
+    assert status.path_resolved_supported is True
+    assert status.path_validation_state == "validated_and_available"
 
 
 def test_core_session_routes_subject_selection_retrieval_and_source_reproduction():
@@ -193,7 +193,7 @@ def test_core_session_routes_subject_selection_retrieval_and_source_reproduction
     assert reproduced.values == 25.0
 
 
-def test_unimplemented_components_fail_clearly_and_path_is_never_substituted():
+def test_unimplemented_components_fail_clearly_and_fake_backend_never_substitutes_path_data():
     session, _ = fake_session()
     with pytest.raises(PluginError):
         session.derive("missing:derivation", subjects="1")
