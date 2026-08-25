@@ -1,0 +1,94 @@
+name: Core CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast-tests:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.11'
+          - os: ubuntu-latest
+            python: '3.12'
+          - os: ubuntu-latest
+            python: '3.13'
+          - os: ubuntu-latest
+            python: '3.14'
+          - os: windows-latest
+            python: '3.11'
+          - os: windows-latest
+            python: '3.14'
+          - os: macos-latest
+            python: '3.11'
+          - os: macos-latest
+            python: '3.14'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Install package and fast-test dependency
+        run: python -m pip install . pytest
+      - name: Import smoke test
+        run: python -c "import vascuquest; print(vascuquest.__version__)"
+      - name: CLI smoke tests
+        run: |
+          python -m vascuquest --version
+          vascuquest --version
+          python -m vascuquest dataset info --format json
+      - name: Fast non-full-data tests
+        run: python -m pytest -q --ignore=tests/full_data
+
+  package-build:
+    name: Wheel and sdist build/install
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install build frontend
+        run: python -m pip install build
+      - name: Build wheel and sdist
+        run: python -m build
+      - name: Verify distribution artifacts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          wheels = tuple(Path('dist').glob('*.whl'))
+          sdists = tuple(Path('dist').glob('*.tar.gz'))
+          assert len(wheels) == 1, wheels
+          assert len(sdists) == 1, sdists
+          print(wheels[0])
+          print(sdists[0])
+          PY
+      - name: Install wheel in a clean virtual environment
+        run: |
+          python -m venv .venv-wheel
+          WHEEL=$(python -c "from pathlib import Path; print(next(Path('dist').glob('*.whl')))" )
+          .venv-wheel/bin/python -m pip install "$WHEEL"
+          .venv-wheel/bin/python -c "import vascuquest; print(vascuquest.__version__)"
+          .venv-wheel/bin/python -m vascuquest --version
+          .venv-wheel/bin/vascuquest --version
