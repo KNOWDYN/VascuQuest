@@ -1,0 +1,35 @@
+name: Path Reader Tests
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: path-reader-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  synthetic-path-reader:
+    name: Synthetic MATLAB v7.3 path reader
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install package with optional path support
+        run: python -m pip install '.[path]' pytest
+      - name: Run Batch 9 path tests
+        run: >-
+          python -m pytest -q
+          tests/unit/test_batch9_path_mapping.py
+          tests/integration/test_batch9_path_reader.py
+          tests/cli/test_cli_safety.py
