@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  batch12-exporter-pass:
+  batch12-gate:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout PR code
@@ -26,3 +26,12 @@ jobs:
           tests/exporters/test_exporters.py
           tests/contracts/test_ports.py
           tests/contracts/test_provenance.py
+      - name: Run Batch 12 API integration gate
+        run: >-
+          python -m pytest -q
+          tests/integration/test_exporter_api.py
+          tests/integration/test_core_api.py
+          tests/integration/test_batch11_flow_rate.py
+          tests/contracts/test_batch10_public_surface.py
+      - name: Run cumulative non-full-data regression suite
+        run: python -m pytest -q --ignore=tests/full_data
