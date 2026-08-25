@@ -4,7 +4,7 @@ This directory contains explicit real-source validation that is intentionally ex
 
 ## Core PWDB v1 Tier-4 validation
 
-`core_release_validation.py` validates the exact source scope claimed by the core-only VascuQuest v1 release candidate under `BUILD_PLAN_CORE_FIRST_AMENDMENT.md`.
+`core_release_validation.py` validates the exact source scope claimed by the core-only VascuQuest v1 release candidate under the consolidated [`docs/BUILD_PLAN.md`](../../docs/BUILD_PLAN.md).
 
 The claimed production source artifacts are:
 

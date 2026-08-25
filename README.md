@@ -153,20 +153,29 @@ vascuquest plugins describe vascuquest:flow-rate-reconstruction --format json
 
 Unavailable or incompatible components fail explicitly; the CLI does not simulate missing scientific methods.
 
+## Documentation
+
+Internal design, architecture, scientific contracts, data-engineering rules, CLI/API contracts, validation contracts, and the current governing build plan live under [`docs/`](docs/). The repository root is intentionally limited to package-entry files.
+
+The current development sequence is defined by [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md). Historical planning documents are retained under [`docs/history/`](docs/history/) for traceability only.
+
 ## Validation status and limitations
 
 The implemented **core PWDB v1 scope has passed the Batch-15 Tier-4 release-validation gate** in addition to its unit, contract, adapter, scientific, exporter, CLI, integration, packaging, supported-platform, and non-full-data regression gates.
 
 Core-source release validation used the exact six canonical artifacts required by the shipped core capabilities: model configurations, haemodynamic parameters, pulse-wave indices, onset times, geometry, and common-site CSV waveforms. Their canonical manifest checksums were verified; the four scalar tables were exhaustively aligned across all **4,374** canonical simulation identities; the geometry archive contained all **4,374** subject members; all **52** declared common-site site/signal CSV members were exhaustively subject-aligned; deterministic age-stratified geometry and waveform reads succeeded; and the built-in real-source flow-rate reconstruction was validated as `RECONSTRUCTED` using `Q = U*A` in `m^3/s`.
 
-This validation claim is deliberately limited to the implemented core scope. Current limitations remain explicit:
+The separate **Batch-8 Tier-3 path-ingestion gate has also passed** against the canonical real source. That gate checksum-verified the 5.94 GB `pwdb_data_w_aorta_foot_path_p.mat` artifact, resolved its MATLAB v7.3/HDF5 hierarchy, established deterministic bounded subject/path/pressure access and matching path-distance coordinates, and measured the direct-access baseline carried forward to Batch 9.
 
-- dense path-resolved PWDB waveform support is unavailable pending the real-source Batch-8 ingestion gate and subsequent Batch-9 production reader;
+This validation claim remains deliberately limited to implemented production capabilities. Current limitations are explicit:
+
+- dense path-resolved PWDB waveform support is still unavailable until Batch 9 implements the production reader and path-specific Tier-4 validation passes;
 - a path request is never remapped to a common measurement site;
-- VascuQuest does not claim validation against the complete 44.3 GB PWDB archive;
-- path MAT artifacts, `pwdb_data.mat`, alternate MATLAB/WFDB common-site representations, `model_variations`, and plausibility metadata are outside the validated core release scope;
+- VascuQuest does not yet claim validation against the complete 44.3 GB PWDB archive;
+- the Batch-8 path MAT evidence establishes canonical ingestibility, not a shipped path-reader capability;
+- `model_variations` and plausibility metadata remain outside the validated core release scope;
 - only scientific components that have passed their authoritative-definition and method-validation gates are shipped as built-ins;
-- optional MATLAB/HDF5/WFDB reader dependencies are not imposed on the lightweight core solely for unvalidated path functionality.
+- optional MATLAB/HDF5/WFDB reader dependencies are not imposed on the lightweight core solely because the canonical path source was validated in Batch 8.
 
 ## Citation
 
