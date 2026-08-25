@@ -1,9 +1,10 @@
 """Streaming acquisition of canonical source artifacts.
 
-The implementation intentionally makes no claim of HTTP range/resume support.
-Downloads are streamed to unique incomplete work files, verified against the
-canonical manifest, and only then atomically promoted into the managed source
-cache.
+Ordinary artifacts are downloaded to unique incomplete work files, verified
+against the canonical manifest, and only then atomically promoted into the
+managed source cache. Large path-resolved artifacts can separately ask this
+layer whether a verified local copy already exists before choosing sparse
+remote access.
 """
 
 from __future__ import annotations
@@ -84,6 +85,35 @@ class ArtifactAcquirer:
         self._manifest = resolved_manifest
         self._opener = _default_opener if opener is None else opener
         self._chunk_size = chunk_size
+
+    def resolve_local(self, artifact_id: str) -> Path | None:
+        """Return a checksum-verified local copy without initiating network I/O."""
+
+        if not isinstance(artifact_id, str) or not artifact_id or artifact_id != artifact_id.strip():
+            raise ValueError("artifact_id must be a non-empty trimmed string")
+        try:
+            artifact = self._manifest.artifact(artifact_id)
+        except KeyError as exc:
+            raise DatasetUnavailableError(f"unknown canonical artifact {artifact_id!r}") from exc
+
+        self._paths.ensure()
+        for candidate in self._registry.candidates(artifact, self._paths, offline=True):
+            if candidate.local_path is None:
+                continue
+            inspection = verify_artifact(
+                candidate.local_path,
+                artifact,
+                chunk_size=self._chunk_size,
+            )
+            if inspection.state is ArtifactState.VERIFIED:
+                return candidate.local_path
+            if (
+                candidate.kind is SourceKind.VERIFIED_CACHE
+                and inspection.state is ArtifactState.CHECKSUM_FAILED
+                and candidate.local_path.is_file()
+            ):
+                candidate.local_path.unlink()
+        return None
 
     def acquire(self, artifact_id: str, *, offline: bool = False) -> Path:
         """Return a verified canonical artifact using deterministic source precedence."""
