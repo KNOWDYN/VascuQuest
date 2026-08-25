@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -43,6 +44,7 @@ from vascuquest.schema import load_canonical_schema, load_manifest
 
 
 runner = CliRunner()
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 
 class _CLIParityBackend:
@@ -174,6 +176,10 @@ def _session():
 
 def _json(value: str) -> object:
     return json.loads(value)
+
+
+def _strip_ansi(value: str) -> str:
+    return _ANSI_ESCAPE_RE.sub("", value)
 
 
 def test_cli_get_waveform_geometry_and_derive_match_python_api(monkeypatch) -> None:
@@ -431,8 +437,9 @@ def test_installed_acquire_guard_never_prompts_noninteractively(tmp_path: Path) 
     )
     assert guarded.returncode == 2
     assert guarded.stdout == ""
-    assert "requires --yes" in guarded.stderr
-    assert "Acquisition plan:" in guarded.stderr
+    plain_stderr = _strip_ansi(guarded.stderr)
+    assert "requires --yes" in plain_stderr
+    assert "Acquisition plan:" in plain_stderr
 
     missing_source = subprocess.run(
         [
