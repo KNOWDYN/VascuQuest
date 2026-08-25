@@ -2,7 +2,7 @@ name: Core CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, build/batch-15-core-release-validation]
   pull_request:
     branches: [main]
 
@@ -94,7 +94,7 @@ jobs:
           .venv-wheel/bin/vascuquest --version
 
   batch15-core-tier4:
-    if: github.head_ref == 'build/batch-15-core-release-validation'
+    if: github.head_ref == 'build/batch-15-core-release-validation' || github.ref_name == 'build/batch-15-core-release-validation'
     name: Batch 15 real-source core Tier-4
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -119,7 +119,7 @@ jobs:
         run: |
           python tests/full_data/core_release_validation.py \
             --report "$VQ_REPORT" \
-            --code-revision "${{ github.event.pull_request.head.sha }}" \
+            --code-revision "${{ github.event.pull_request.head.sha || github.sha }}" \
             --repo-root .
       - name: Upload machine-readable validation report
         if: always()
