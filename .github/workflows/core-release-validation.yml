@@ -1,0 +1,48 @@
+name: Core release validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tier4-core:
+    name: PWDB core Tier-4 / Python 3.12
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout release candidate
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile release-validation harness
+        run: python -m py_compile tests/full_data/core_release_validation.py
+
+      - name: Install release candidate
+        run: python -m pip install .
+
+      - name: Run real-source core Tier-4 validation
+        shell: bash
+        run: |
+          export XDG_DATA_HOME="$RUNNER_TEMP/vascuquest-xdg/data"
+          export XDG_CACHE_HOME="$RUNNER_TEMP/vascuquest-xdg/cache"
+          export XDG_STATE_HOME="$RUNNER_TEMP/vascuquest-xdg/state"
+          python tests/full_data/core_release_validation.py \
+            --report core-release-validation.json \
+            --code-revision "${{ github.sha }}" \
+            --repo-root .
+
+      - name: Upload machine-readable validation report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: vascuquest-core-release-validation
+          path: core-release-validation.json
+          if-no-files-found: error
+          retention-days: 90

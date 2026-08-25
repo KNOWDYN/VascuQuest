@@ -155,15 +155,16 @@ Unavailable or incompatible components fail explicitly; the CLI does not simulat
 
 ## Validation status and limitations
 
-The current core implementation has passed its unit, contract, adapter, scientific, exporter, CLI, integration, packaging, and non-full-data regression tests through Batch 13. Batch 14 adds the permanent supported-platform CI and package build/install gate.
+The implemented **core PWDB v1 scope has passed the Batch-15 Tier-4 release-validation gate** in addition to its unit, contract, adapter, scientific, exporter, CLI, integration, packaging, supported-platform, and non-full-data regression gates.
 
-This is **not yet a release-validation claim**. Core-source release validation is a separate Batch-15 gate and must execute against the exact canonical artifacts required by the capabilities claimed by the release candidate.
+Core-source release validation used the exact six canonical artifacts required by the shipped core capabilities: model configurations, haemodynamic parameters, pulse-wave indices, onset times, geometry, and common-site CSV waveforms. Their canonical manifest checksums were verified; the four scalar tables were exhaustively aligned across all **4,374** canonical simulation identities; the geometry archive contained all **4,374** subject members; all **52** declared common-site site/signal CSV members were exhaustively subject-aligned; deterministic age-stratified geometry and waveform reads succeeded; and the built-in real-source flow-rate reconstruction was validated as `RECONSTRUCTED` using `Q = U*A` in `m^3/s`.
 
-Current limitations are explicit:
+This validation claim is deliberately limited to the implemented core scope. Current limitations remain explicit:
 
 - dense path-resolved PWDB waveform support is unavailable pending the real-source Batch-8 ingestion gate and subsequent Batch-9 production reader;
 - a path request is never remapped to a common measurement site;
-- VascuQuest does not currently claim validation against the complete 44.3 GB PWDB archive;
+- VascuQuest does not claim validation against the complete 44.3 GB PWDB archive;
+- path MAT artifacts, `pwdb_data.mat`, alternate MATLAB/WFDB common-site representations, `model_variations`, and plausibility metadata are outside the validated core release scope;
 - only scientific components that have passed their authoritative-definition and method-validation gates are shipped as built-ins;
 - optional MATLAB/HDF5/WFDB reader dependencies are not imposed on the lightweight core solely for unvalidated path functionality.
 
