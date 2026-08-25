@@ -177,12 +177,14 @@ def _sidecar_document(
     *,
     data_path: Path,
     values: np.ndarray,
-    coordinates: tuple[np.ndarray, ...],
     columns: tuple[str, ...],
 ) -> dict[str, object]:
+    coordinate_by_name = {
+        coordinate.name: coordinate.values for coordinate in result.coordinates
+    }
     coordinate_values = {
-        dimension: _encode_portable(coordinates[axis])
-        for axis, dimension in enumerate(result.dimensions)
+        dimension: _encode_portable(coordinate_by_name[dimension])
+        for dimension in result.dimensions
     }
     return {
         "format": _CSV_SIDECAR_FORMAT,
@@ -254,7 +256,6 @@ class CSVResultExporter:
             result,
             data_path=data_path,
             values=values,
-            coordinates=coordinates,
             columns=columns,
         )
         metadata_text = json.dumps(
