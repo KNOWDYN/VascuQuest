@@ -4,15 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vascuquest.data import DataPaths
+from vascuquest.data import ArtifactAcquirer, DataPaths
 from vascuquest.domain.evidence import EvidenceClass
 from vascuquest.domain.location import PathPosition
 from vascuquest.domain.result import Coordinate, ValidityState, ValueState, Waveform
 from vascuquest.errors import SchemaError
 from vascuquest.ports.backend import CapabilitySet, WaveformRequest
-from vascuquest.schema import CanonicalManifest, CanonicalSchema
+from vascuquest.schema import CanonicalManifest, CanonicalSchema, load_manifest
 
 from .backend import ArtifactResolver, PWDB3275625Backend
+from .http_range import CanonicalRemoteFile
 from .path_reader import (
     PATH_ARTIFACT_SPECS,
     PATH_CAPABILITIES,
@@ -23,6 +24,11 @@ from .path_reader import (
 _PATH_CACHE_PROVENANCE = (
     "runtime path access may use a rebuildable exact-fidelity derived cache keyed "
     "to the canonical artifact checksum; the canonical PWDB artifact remains the source"
+)
+_REMOTE_RANGE_PROVENANCE = (
+    "large canonical PWDB path artifacts may be accessed through bounded HTTP byte ranges "
+    "after Zenodo record metadata is matched to the manifest-pinned filename, size and checksum; "
+    "the full remote file is not rehashed on every sparse read"
 )
 
 
@@ -46,6 +52,44 @@ class PWDB3275625PathBackend(PWDB3275625Backend):
         self._derived_root = resolved_root
         self._path_readers: dict[str, PathWaveformReader] = {}
 
+    @classmethod
+    def from_acquirer(
+        cls,
+        acquirer: ArtifactAcquirer,
+        *,
+        offline: bool = False,
+        schema: CanonicalSchema | None = None,
+        manifest: CanonicalManifest | None = None,
+    ) -> "PWDB3275625PathBackend":
+        """Compose local-first path access without forcing giant network downloads."""
+
+        if not isinstance(acquirer, ArtifactAcquirer):
+            raise TypeError("acquirer must be an ArtifactAcquirer")
+        if not isinstance(offline, bool):
+            raise TypeError("offline must be a boolean")
+        resolved_manifest = load_manifest() if manifest is None else manifest
+        if not isinstance(resolved_manifest, CanonicalManifest):
+            raise TypeError("manifest must be a CanonicalManifest")
+
+        def resolve(artifact_id: str):
+            if artifact_id in PATH_ARTIFACT_SPECS:
+                local = acquirer.resolve_local(artifact_id)
+                if local is not None:
+                    return local
+                if offline:
+                    return acquirer.acquire(artifact_id, offline=True)
+                artifact = resolved_manifest.artifact(artifact_id)
+                return CanonicalRemoteFile(
+                    url=artifact.source_locator,
+                    record_id=artifact.canonical_record_id,
+                    filename=artifact.filename,
+                    checksum_algorithm=artifact.checksum_algorithm,
+                    checksum_value=artifact.checksum_value,
+                )
+            return acquirer.acquire(artifact_id, offline=offline)
+
+        return cls(resolve, schema=schema, manifest=resolved_manifest)
+
     def capabilities(self) -> CapabilitySet:
         return super().capabilities() | PATH_CAPABILITIES
 
@@ -63,7 +107,8 @@ class PWDB3275625PathBackend(PWDB3275625Backend):
             request.location.canonical_path_id,
             source_signal,
         )
-        series = self._path_reader(artifact_id).read(
+        reader = self._path_reader(artifact_id)
+        series = reader.read(
             subject_id=request.subject.canonical_subject_id,
             source_signal=source_signal,
             position_index=request.location.position_index,
@@ -77,11 +122,10 @@ class PWDB3275625PathBackend(PWDB3275625Backend):
             if missing_count
             else ()
         )
-        validity = (
-            ValidityState.VALID_WITH_WARNING
-            if warnings
-            else ValidityState.NOT_EVALUATED
-        )
+        validity = ValidityState.VALID_WITH_WARNING if warnings else ValidityState.NOT_EVALUATED
+        assumptions = [_PATH_CACHE_PROVENANCE]
+        if series.source_access_mode == "zenodo_manifest_pinned_http_range":
+            assumptions.append(_REMOTE_RANGE_PROVENANCE)
         provenance = self._provenance_builder().build(
             evidence=EvidenceClass.SOURCE,
             validity=validity,
@@ -89,12 +133,8 @@ class PWDB3275625PathBackend(PWDB3275625Backend):
             source_artifacts=(self._artifact_reference(artifact_id),),
             subject=request.subject,
             location=request.location,
-            source_fields=(
-                source_signal,
-                series.source_dataset,
-                series.distance_dataset,
-            ),
-            assumptions=(_PATH_CACHE_PROVENANCE,),
+            source_fields=(source_signal, series.source_dataset, series.distance_dataset),
+            assumptions=tuple(assumptions),
             citations=quantity_schema.definition.citations,
             warnings=warnings,
             output_identity=(
@@ -134,15 +174,15 @@ class PWDB3275625PathBackend(PWDB3275625Backend):
             spec = PATH_ARTIFACT_SPECS[artifact_id]
         except KeyError as exc:
             raise SchemaError(f"unknown PWDB path artifact {artifact_id!r}") from exc
-        source_path = self._artifact_resolver(artifact_id)
-        if not isinstance(source_path, Path):
-            raise TypeError("artifact_resolver must return pathlib.Path values")
+        source = self._artifact_resolver(artifact_id)
+        if not isinstance(source, (Path, CanonicalRemoteFile)):
+            raise TypeError("path artifact resolver must return pathlib.Path or CanonicalRemoteFile values")
         try:
             artifact = self._manifest.artifact(artifact_id)
         except KeyError as exc:
             raise SchemaError(f"canonical manifest lacks path artifact {artifact_id!r}") from exc
         reader = PathWaveformReader(
-            source_path,
+            source,
             self._derived_root,
             spec,
             source_checksum=artifact.checksum_value,
