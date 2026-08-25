@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 import shutil
 import sys
 from collections.abc import Iterable, Mapping
@@ -37,6 +38,7 @@ from .rendering import RenderingError, serialize_primary, write_primary
 
 CANONICAL_DATASET = "pwdb:3275625"
 _LARGE_DOWNLOAD_BYTES = 1024**3
+_ASSIGNMENT_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]*$")
 
 
 dataset_app = typer.Typer(help="Inspect and manage canonical dataset sources.")
@@ -66,6 +68,10 @@ def _parse_assignments(values: Iterable[str], option_name: str) -> dict[str, obj
         if not name or name != name.strip() or not text:
             raise typer.BadParameter(
                 f"{option_name} values must use non-empty trimmed name=value syntax"
+            )
+        if _ASSIGNMENT_NAME_RE.fullmatch(name) is None:
+            raise typer.BadParameter(
+                f"{option_name} names must use identifier syntax; comparison operators are not supported"
             )
         if name in parsed:
             raise typer.BadParameter(f"duplicate {option_name} name {name!r}")
