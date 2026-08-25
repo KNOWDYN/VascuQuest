@@ -49,24 +49,24 @@ python tests/full_data/core_release_validation.py \
 
 `pwdb3275625_ingestion_spike.py` is the mandatory empirical gate before any production path reader is implemented. It is validation tooling, not a backend.
 
-The fresh Batch-8 runner acquires and checksum-verifies these canonical artifacts from Zenodo record `3275625`:
+The Batch-8 runner acquires and checksum-verifies these canonical artifacts from Zenodo record `3275625`:
 
 1. `pwdb_model_configs.csv` — explicit subject-index audit;
 2. `geo.zip` — subject-specific geometry audit;
 3. `PWs_csv.zip` — canonical common-site CSV comparison source;
-4. `PWs_wfdb.zip` — required real WFDB inspection and cross-representation comparison;
+4. `PWs_wfdb.zip` — real WFDB inspection and cross-representation comparison;
 5. `pwdb_data.mat` — conventional MATLAB structural inspection;
 6. `pwdb_data_w_aorta_foot_path_p.mat` — real multi-gigabyte path-pressure source.
 
 The decisive path artifact must match canonical MD5 `58a5bfc5eeeb6584652c8238eceba73c` before any path result is accepted.
 
-The Tier-3 harness records:
+The corrected Tier-3 harness records:
 
 - canonical checksum and byte size for every required artifact;
 - actual source format/hierarchy and indexing semantics;
 - exact 1..4374 subject alignment where represented;
 - representative geometry structure;
-- real WFDB sampling metadata and CSV-vs-WFDB differences with an absolute tolerance derived from one WFDB ADC quantization step;
+- real WFDB sampling metadata and CSV-vs-WFDB differences using a source-derived bound that combines MATLAB `dlmwrite` five-significant-digit rounding with WFDB quantization;
 - conventional `pwdb_data.mat` top-level structure without loading the nested dataset into memory;
 - a bounded HDF5/MATLAB-v7.3 read of subject 1 / `aorta_foot` / pressure;
 - path-position/distance cardinality when distance metadata is present;
@@ -74,16 +74,32 @@ The Tier-3 harness records:
 - Linux RSS before/after each bounded path read when available;
 - deterministic repeated numeric identity;
 - explicit lack of HTTP range/resume claims;
-- an evidence-backed `DIRECT`, `INDEXED`, or `CONVERTED` path strategy decision.
+- an evidence-backed canonical path-access candidate for Batch 9.
 
-A successful bounded direct read does not itself create path support. It only permits Batch 8 to select `DIRECT` as the Batch-9 candidate when the real measurements also show deterministic bounded access and valid path-position alignment. `path_reader.py` remains forbidden until this gate passes.
+### Batch-8 gate result
+
+Batch 8 passed on canonical real-source workflow run `32893318886`, code revision `00dd2c1c7d9ec79ee5272707b9fc0b808793599c`.
+
+The run established:
+
+- checksum-verified direct access to the 5.94 GB MATLAB v7.3/HDF5 path artifact;
+- subject 1 / `aorta_foot` / pressure resolution without whole-file materialization;
+- a 412-sample float64 bounded waveform at one path position;
+- 72 waveform positions and 72 distance coordinates with matching cardinality;
+- byte-identical repeated bounded reads;
+- first bounded access of approximately `100.047 s` with `601,878,528` bytes measured RSS growth;
+- repeated bounded access of approximately `94.519 s` with `5,849,088` bytes measured RSS growth.
+
+The machine-readable Tier-3 report therefore selects `DIRECT` as the **canonical access candidate**: the source is scientifically addressable directly and deterministically. The measured latency is also explicit evidence that naive MATLAB-reference traversal is not acceptable as the final public-reader experience.
+
+That performance observation is a Batch-9 engineering requirement, not an additional Batch-8 gate. Batch 9 must implement and test bounded production path-reader semantics, including an optimized persistent lookup/index or equivalent access mechanism, while preserving canonical source identity and prohibiting silent substitution with common-site data. Batch 8 does not require a separate INDEXED-versus-CONVERTED benchmark before closure.
 
 ### Batch-8 local/online execution
 
 When the six canonical artifacts are already present in one verified source directory:
 
 ```bash
-python tests/full_data/pwdb3275625_ingestion_spike.py /path/to/source \
+python tests/full_data/pwdb3275625_ingestion_spike_corrected.py /path/to/source \
   --report pwdb3275625-tier3-report.json \
   --code-revision "$(git rev-parse HEAD)"
 ```
@@ -100,6 +116,6 @@ The validation environment requires `numpy`, `scipy`, `h5py`, and `wfdb`; these 
 
 ## Explicit scope boundary
 
-The completed core Tier-4 gate does **not** validate or claim dense path-resolved waveforms. Conversely, Batch 8 does not implement production path semantics. Synthetic fixtures, common-site data, exporter source inspection, or source-code assumptions must never substitute for a checksum-verified real path-MAT run.
+The completed core Tier-4 gate does **not** validate or claim dense path-resolved waveforms. Batch 8 proves real canonical path ingestion and establishes the source-access baseline; it does not implement production path semantics. Synthetic fixtures, common-site data, exporter source inspection, or source-code assumptions must never substitute for the checksum-verified real path-MAT evidence.
 
-A Batch-8 failure is a hard empirical failure. It must not be converted to `xfail`, hidden, or used to justify Batch 9. The package remains explicit that path support is unavailable until Batch 8 and Batch 9 pass.
+Path support remains unavailable until Batch 9 implements the production reader and path-specific Tier-4 validation passes.
