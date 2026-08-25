@@ -56,3 +56,5 @@ jobs:
                   for line in completed.stdout.splitlines():
                       json.loads(line)
           PY
+      - name: Run targeted Batch 13 CLI tests
+        run: python -m pytest -q tests/cli
