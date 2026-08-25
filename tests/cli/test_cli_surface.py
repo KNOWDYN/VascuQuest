@@ -84,6 +84,34 @@ def test_metadata_machine_output_is_clean_and_parseable() -> None:
     assert "vascuquest:csv" in ids
 
 
+def test_plugin_describe_exposes_declared_scientific_contract() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "plugins",
+            "describe",
+            "vascuquest:flow-rate-reconstruction",
+            "--format",
+            "json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert result.stderr == ""
+    payload = json.loads(result.stdout)
+    assert payload["kind"] == "derivation"
+    assert payload["qualified_id"] == "vascuquest:flow-rate-reconstruction"
+    assert [item["name"] for item in payload["required_inputs"]] == [
+        "flow_velocity",
+        "luminal_area",
+    ]
+    assert payload["output_quantity"]["canonical_name"] == "flow_rate"
+    assert payload["output_quantity"]["canonical_unit"] == "m^3/s"
+    assert payload["output_evidence"] == "RECONSTRUCTED"
+    assert payload["parameter_specs"] == []
+    assert payload["validation_scope"]
+    assert payload["citations"]
+
+
 def test_usage_and_assignment_syntax_fail_with_code_two() -> None:
     missing = runner.invoke(app, ["get"])
     assert missing.exit_code == 2
