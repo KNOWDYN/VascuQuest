@@ -1,0 +1,62 @@
+name: Core release validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/core-release-validation.yml"
+      - "tests/full_data/core_release_validation.py"
+      - "tests/full_data/README.md"
+      - "README.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-release-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tier4-core:
+    name: PWDB core Tier-4 / Python 3.12
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      XDG_DATA_HOME: ${{ runner.temp }}/vascuquest-xdg/data
+      XDG_CACHE_HOME: ${{ runner.temp }}/vascuquest-xdg/cache
+      XDG_STATE_HOME: ${{ runner.temp }}/vascuquest-xdg/state
+      VQ_REPORT: ${{ runner.temp }}/vascuquest-core-release-validation.json
+
+    steps:
+      - name: Checkout release candidate
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install release candidate
+        run: python -m pip install .
+
+      - name: Run real-source core Tier-4 validation
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            revision="${{ github.event.pull_request.head.sha }}"
+          else
+            revision="${{ github.sha }}"
+          fi
+          python tests/full_data/core_release_validation.py \
+            --report "$VQ_REPORT" \
+            --code-revision "$revision" \
+            --repo-root .
+
+      - name: Upload machine-readable validation report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: vascuquest-core-release-validation
+          path: ${{ env.VQ_REPORT }}
+          if-no-files-found: error
+          retention-days: 90
