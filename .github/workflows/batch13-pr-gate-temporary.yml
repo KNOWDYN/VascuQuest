@@ -1,0 +1,39 @@
+name: Batch 13 PR gate (temporary)
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  batch13-pass:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install package and test dependency
+        run: python -m pip install -e . pytest
+      - name: Run Batch 13 first-pass smoke gate
+        run: |
+          python - <<'PY'
+          from typer.testing import CliRunner
+          from vascuquest.cli.app import app
+
+          runner = CliRunner()
+          for args in (
+              ['--help'],
+              ['--version'],
+              ['dataset', 'info', '--format', 'json'],
+              ['quantities', '--format', 'jsonl'],
+              ['plugins', 'list', '--format', 'jsonl'],
+          ):
+              result = runner.invoke(app, args)
+              assert result.exit_code == 0, (args, result.output, result.exception)
+          PY
