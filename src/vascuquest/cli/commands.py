@@ -576,20 +576,36 @@ def get_command(
 def waveform_command(
     signal: str = typer.Argument(...),
     subject: str = typer.Option(..., "--subject"),
-    location: str = typer.Option(..., "--location"),
+    location: str | None = typer.Option(None, "--location"),
+    path: str | None = typer.Option(None, "--path"),
+    position: int | None = typer.Option(None, "--position"),
     dataset: str = typer.Option(CANONICAL_DATASET, "--dataset"),
     source: str | None = typer.Option(None, "--source"),
     offline: bool = typer.Option(False, "--offline"),
     output_format: str = typer.Option("text", "--format"),
     output: str | None = typer.Option(None, "--output"),
 ) -> None:
-    """Retrieve one common-site waveform through the public session API."""
+    """Retrieve one named-site or source-supported path-position waveform."""
 
+    if location is not None and (path is not None or position is not None):
+        raise typer.BadParameter("--location is mutually exclusive with --path/--position")
+    if path is None and position is not None:
+        raise typer.BadParameter("--position requires --path")
+    if path is not None and position is None:
+        raise typer.BadParameter("--path requires --position")
+    if location is None and path is None:
+        raise typer.BadParameter("choose either --location or --path with --position")
+
+    resolved_location = (
+        MeasurementSite(location)
+        if location is not None
+        else PathPosition(path, position)  # type: ignore[arg-type]
+    )
     session = _open_session(dataset, source=source, offline=offline)
     result = session.waveform(
         signal,
         subject=subject,
-        location=MeasurementSite(location),
+        location=resolved_location,
     )
     _emit(result, output_format, output)
 
