@@ -31,5 +31,6 @@ jobs:
         run: >-
           python -m pytest -q
           tests/unit/test_batch9_path_mapping.py
+          tests/unit/test_http_range_reader.py
           tests/integration/test_batch9_path_reader.py
           tests/cli/test_cli_safety.py
