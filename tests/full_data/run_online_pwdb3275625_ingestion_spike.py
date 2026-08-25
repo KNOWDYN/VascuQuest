@@ -1,10 +1,7 @@
 """Acquire the minimum canonical PWDB Tier-3 artifacts, then run Batch 8.
 
 This validation runner intentionally uses VascuQuest's production acquisition
-layer.  It is not production backend code and does not claim HTTP range/resume.
-After the canonical ingestion spike passes, it runs the separate strategy-
-resolution benchmark against the same verified local artifacts so the large
-Zenodo files are not downloaded a second time within the job.
+layer. It is not production backend code and does not claim HTTP range/resume.
 """
 
 from __future__ import annotations
@@ -47,7 +44,6 @@ def main() -> int:
 
     workspace = args.workspace.expanduser().resolve()
     report = args.report.expanduser().resolve()
-    strategy_report = report.with_name(report.stem + "-path-strategy.json")
     paths = DataPaths.under(workspace)
     paths.ensure()
     registry = SourceRegistry(paths.state_file("sources.json"))
@@ -74,20 +70,7 @@ def main() -> int:
     if args.code_revision:
         command.extend(["--code-revision", args.code_revision])
     completed = subprocess.run(command, check=False)
-    if completed.returncode != 0:
-        return int(completed.returncode)
-
-    strategy = Path(__file__).with_name("pwdb3275625_path_strategy_resolution.py")
-    strategy_command = [
-        sys.executable,
-        str(strategy),
-        str(paths.source),
-        str(report),
-        "--report",
-        str(strategy_report),
-    ]
-    strategy_completed = subprocess.run(strategy_command, check=False)
-    return int(strategy_completed.returncode)
+    return int(completed.returncode)
 
 
 if __name__ == "__main__":
