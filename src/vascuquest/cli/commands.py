@@ -367,7 +367,10 @@ def dataset_acquire(
         raise DatasetUnavailableError(f"unsupported dataset {dataset!r}")
     paths, registry, manifest = _data_context()
     if source is not None:
-        registry.register_local(Path(source).expanduser())
+        try:
+            registry.register_local(Path(source).expanduser())
+        except ValueError as exc:
+            raise DatasetUnavailableError(str(exc)) from exc
     planned = _planned_artifacts(artifact=artifact, capability=capability, manifest=manifest)
     typer.echo(
         "Acquisition plan: "
@@ -706,19 +709,7 @@ def plugins_describe(
 ) -> None:
     """Describe one component through the public plugin inspection API."""
 
-    item = vq.plugins.describe(qualified_id)
-    payload = {
-        "kind": item.kind.value,
-        "qualified_id": item.qualified_id,
-        "name": item.name,
-        "implementation_version": item.implementation_version,
-        "protocol_version": item.protocol_version,
-        "distribution_name": item.distribution_name,
-        "distribution_version": item.distribution_version,
-        "summary": item.summary,
-        "citations": list(item.citations),
-    }
-    _emit(payload, output_format, output)
+    _emit(vq.plugins.details(qualified_id), output_format, output)
 
 
 def export_command(
