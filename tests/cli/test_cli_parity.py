@@ -22,6 +22,7 @@ from vascuquest.domain import (
     Waveform,
 )
 from vascuquest.errors import CapabilityError
+from vascuquest.exporters import JSONResultExporter, load_result_csv
 from vascuquest.methods import (
     FLOW_RATE_RECONSTRUCTION_ID,
     create_flow_rate_reconstruction,
@@ -33,7 +34,12 @@ from vascuquest.plugins.descriptor import (
 )
 from vascuquest.plugins.registry import PluginRegistry
 from vascuquest.ports.backend import GeometryRequest, QuantityRequest, WaveformRequest
-from vascuquest.schema import load_canonical_schema
+from vascuquest.provenance import (
+    ProvenanceRecord,
+    SourceArtifactReference,
+    provenance_to_json,
+)
+from vascuquest.schema import load_canonical_schema, load_manifest
 
 
 runner = CliRunner()
@@ -244,6 +250,73 @@ def test_cli_exact_match_subject_selection_matches_python(monkeypatch) -> None:
     assert cli_ids == direct_ids == ["2"]
 
 
+def test_cli_export_round_trip_uses_registered_exporter(tmp_path: Path) -> None:
+    session = vq.open_dataset(offline=True)
+    result = ScientificResult(
+        dataset_identity=session.identity,
+        quantity=load_canonical_schema().quantity("age"),
+        values=np.asarray((25.0, 55.0)),
+        provenance_ref="cli-export-fixture",
+        dimensions=("subject",),
+        coordinates=(Coordinate("subject", ("1", "2")),),
+    )
+    source = tmp_path / "source.json"
+    JSONResultExporter().export(result, source, {})
+    destination = tmp_path / "result.csv"
+
+    exported = runner.invoke(
+        app,
+        [
+            "export",
+            str(source),
+            "--exporter",
+            "vascuquest:csv",
+            "--output",
+            str(destination),
+            "--format",
+            "json",
+        ],
+    )
+    assert exported.exit_code == 0, exported.output
+    assert destination.exists()
+    assert destination.with_suffix(".csv.meta.json").exists()
+    rebuilt = load_result_csv(destination)
+    assert rebuilt.dataset_identity == result.dataset_identity
+    assert rebuilt.quantity == result.quantity
+    np.testing.assert_allclose(rebuilt.values, result.values)
+
+
+def test_cli_reproduce_matches_python_source_reproduction(tmp_path: Path, monkeypatch) -> None:
+    session = _session()
+    monkeypatch.setattr(vq, "open_dataset", lambda *args, **kwargs: session)
+    artifact = load_manifest().artifact("model_configurations")
+    provenance = ProvenanceRecord(
+        record_id="cli-source-age-1",
+        dataset_identity=session.identity,
+        schema_version=session.identity.schema_version,
+        evidence=vq.EvidenceClass.SOURCE,
+        source_artifacts=(
+            SourceArtifactReference(
+                artifact_id=artifact.artifact_id,
+                checksum_algorithm=artifact.checksum_algorithm,
+                checksum_value=artifact.checksum_value,
+            ),
+        ),
+        subject=SubjectKey(session.identity, "1"),
+        output_identity="age",
+    )
+    provenance_path = tmp_path / "provenance.json"
+    provenance_path.write_text(provenance_to_json(provenance), encoding="utf-8")
+
+    direct = session.reproduce(provenance)
+    cli = runner.invoke(
+        app,
+        ["reproduce", str(provenance_path), "--format", "json"],
+    )
+    assert cli.exit_code == 0, cli.output
+    assert _json(cli.stdout) == _json(serialize_primary(direct, "json"))
+
+
 def _isolated_environment(tmp_path: Path) -> dict[str, str]:
     env = os.environ.copy()
     env["XDG_DATA_HOME"] = str(tmp_path / "data")
@@ -277,6 +350,30 @@ def test_installed_cli_error_boundary_preserves_stdout_and_exit_codes(tmp_path: 
     assert unavailable.returncode == 3
     assert unavailable.stdout == ""
     assert "DatasetUnavailableError" in unavailable.stderr
+    assert "Traceback" not in unavailable.stderr
+
+    debug = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "vascuquest",
+            "--debug",
+            "waveform",
+            "pressure",
+            "--subject",
+            "1",
+            "--location",
+            "AorticRoot",
+            "--offline",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+    assert debug.returncode == 3
+    assert debug.stdout == ""
+    assert "Traceback" in debug.stderr
 
     plugin = subprocess.run(
         [
@@ -311,3 +408,52 @@ def test_installed_cli_error_boundary_preserves_stdout_and_exit_codes(tmp_path: 
     assert integrity.returncode == 4
     assert integrity.stdout == ""
     assert "IntegrityError" in integrity.stderr
+
+
+def test_installed_acquire_guard_never_prompts_noninteractively(tmp_path: Path) -> None:
+    env = _isolated_environment(tmp_path)
+    guarded = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "vascuquest",
+            "dataset",
+            "acquire",
+            "--artifact",
+            "model_configurations",
+            "--offline",
+        ],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+    assert guarded.returncode == 2
+    assert guarded.stdout == ""
+    assert "requires --yes" in guarded.stderr
+    assert "Acquisition plan:" in guarded.stderr
+
+    missing_source = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "vascuquest",
+            "dataset",
+            "acquire",
+            "--artifact",
+            "model_configurations",
+            "--source",
+            str(tmp_path / "does-not-exist"),
+            "--yes",
+            "--offline",
+        ],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+    assert missing_source.returncode == 3
+    assert missing_source.stdout == ""
+    assert "DatasetUnavailableError" in missing_source.stderr
