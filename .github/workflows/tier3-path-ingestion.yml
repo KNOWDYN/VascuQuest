@@ -1,0 +1,65 @@
+name: Tier-3 path ingestion
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build/batch-8-tier3-path-ingestion
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tier3-path-ingestion-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tier3-path:
+    name: PWDB Batch 8 Tier-3 / Python 3.12
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout Batch-8 candidate
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Show runner storage before acquisition
+        run: df -h
+
+      - name: Compile Tier-3 harness
+        run: |
+          python -m py_compile \
+            tests/full_data/pwdb3275625_ingestion_spike.py \
+            tests/full_data/pwdb3275625_ingestion_spike_corrected.py \
+            tests/full_data/run_online_pwdb3275625_ingestion_spike.py
+
+      - name: Install Batch-8 validation environment
+        run: |
+          python -m pip install .
+          python -m pip install "scipy>=1.17,<2" "h5py>=3.15,<4" "wfdb>=4.3,<5"
+
+      - name: Run canonical real-source Tier-3 path gate
+        shell: bash
+        run: |
+          python tests/full_data/run_online_pwdb3275625_ingestion_spike.py \
+            "$RUNNER_TEMP/vascuquest-tier3" \
+            --report pwdb3275625-tier3-report.json \
+            --code-revision "${{ github.sha }}"
+
+      - name: Show runner storage after acquisition
+        if: always()
+        run: df -h
+
+      - name: Upload machine-readable Tier-3 report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: vascuquest-pwdb-tier3-path-ingestion
+          path: pwdb3275625-tier3-report.json
+          if-no-files-found: warn
+          retention-days: 90
