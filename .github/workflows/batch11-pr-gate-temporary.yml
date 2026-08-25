@@ -30,5 +30,9 @@ jobs:
           cache: 'pip'
       - name: Install package and test dependency
         run: python -m pip install -e . pytest
-      - name: Run Batch 11 scientific pass gate
+      - name: Run Batch 11 scientific component tests
         run: python -m pytest -q tests/scientific/test_reconstructions.py tests/contracts/test_ports.py tests/contracts/test_plugins.py
+      - name: Run Batch 11 session integration tests
+        run: python -m pytest -q tests/integration/test_batch11_flow_rate.py tests/integration/test_core_api.py
+      - name: Run cumulative non-full-data regression suite
+        run: python -m pytest -q --ignore=tests/full_data
