@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use VascuQuest in research, please cite this software and the underlying PWDB dataset used by your analysis."
+title: "VascuQuest"
+type: software
+version: 0.1.0
+date-released: 2026-08-26
+authors:
+  - family-names: "Saqr"
+    given-names: "Khalid M."
+repository-code: "https://github.com/KNOWDYN/VascuQuest"
+url: "https://github.com/KNOWDYN/VascuQuest"
+license: Apache-2.0
+keywords:
+  - haemodynamics
+  - hemodynamics
+  - pulse wave
+  - vascular
+  - virtual population
+  - scientific computing
