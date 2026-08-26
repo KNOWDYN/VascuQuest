@@ -4,6 +4,12 @@ Verified local PWDB path artifacts retain the existing eager per-subject cache.
 Remote canonical Zenodo artifacts use a small derived subject index plus exact
 per-position waveform caches so one requested path position never causes all
 positions/signals for the subject to be materialized.
+
+Remote reads keep one bounded HTTP-range/HDF5 session alive per artifact reader.
+This is important for MATLAB-v7.3 files: opening the HDF5 hierarchy requires a
+small set of remote metadata blocks, while resolving already-open object
+references is cheap. Reusing that bounded session prevents the same metadata
+ranges from being transferred again for every uncached path position.
 """
 
 from __future__ import annotations
@@ -13,15 +19,24 @@ import math
 import os
 from pathlib import Path
 import tempfile
+from threading import RLock
 from typing import Any
 
 import numpy as np
 
 from vascuquest.errors import CapabilityError, IntegrityError, SchemaError, SelectionError
 
-from .http_range import CanonicalRemoteFile, HTTPRangeReader, RemoteFileMetadata, verify_zenodo_file_identity
+from .http_range import (
+    CanonicalRemoteFile,
+    HTTPRangeReader,
+    RemoteFileMetadata,
+    verify_zenodo_file_identity,
+)
 from . import path_reader as eager
 
+# These are caller hints. HTTPRangeReader promotes multi-gigabyte files to its
+# large-file minimum block size and caps its cache, currently yielding a bounded
+# 64 MiB range cache for canonical PWDB path artifacts.
 _REMOTE_BLOCK_SIZE = 64 * 1024
 _REMOTE_MAX_BLOCKS = 256
 _REMOTE_INDEX_VERSION = 1
@@ -49,6 +64,9 @@ class HybridPathWaveformReader:
         "_bytes_transferred",
         "_range_requests",
         "_remote_opens",
+        "_remote_reader",
+        "_remote_handle",
+        "_remote_lock",
     )
 
     def __init__(
@@ -67,14 +85,24 @@ class HybridPathWaveformReader:
             raise TypeError("spec must be a PathArtifactSpec")
         if not isinstance(source_checksum, str) or not source_checksum:
             raise ValueError("source_checksum must be a non-empty string")
-        if isinstance(source, CanonicalRemoteFile) and source.checksum_value.lower() != source_checksum.lower():
-            raise IntegrityError("remote path source checksum does not match the canonical manifest")
+        if (
+            isinstance(source, CanonicalRemoteFile)
+            and source.checksum_value.lower() != source_checksum.lower()
+        ):
+            raise IntegrityError(
+                "remote path source checksum does not match the canonical manifest"
+            )
         self._source = source
         self._cache_root = cache_root
         self._spec = spec
         self._source_checksum = source_checksum.lower()
         self._local = (
-            eager.PathWaveformReader(source, cache_root, spec, source_checksum=source_checksum)
+            eager.PathWaveformReader(
+                source,
+                cache_root,
+                spec,
+                source_checksum=source_checksum,
+            )
             if isinstance(source, Path)
             else None
         )
@@ -83,6 +111,9 @@ class HybridPathWaveformReader:
         self._bytes_transferred = 0
         self._range_requests = 0
         self._remote_opens = 0
+        self._remote_reader: HTTPRangeReader | None = None
+        self._remote_handle: Any | None = None
+        self._remote_lock = RLock()
 
     @property
     def spec(self) -> eager.PathArtifactSpec:
@@ -90,17 +121,30 @@ class HybridPathWaveformReader:
 
     @property
     def source_access_mode(self) -> str:
-        return "verified_local_artifact" if self._local is not None else "zenodo_manifest_pinned_http_range"
+        return (
+            "verified_local_artifact"
+            if self._local is not None
+            else "zenodo_manifest_pinned_http_range"
+        )
 
     @property
     def transport_stats(self) -> RemoteTransportStats:
+        remote = self._remote_reader
+        live_bytes = 0 if remote is None else remote.bytes_transferred
+        live_ranges = 0 if remote is None else remote.range_requests
         return RemoteTransportStats(
-            bytes_transferred=self._bytes_transferred,
-            range_requests=self._range_requests,
+            bytes_transferred=self._bytes_transferred + live_bytes,
+            range_requests=self._range_requests + live_ranges,
             remote_opens=self._remote_opens,
         )
 
-    def read(self, *, subject_id: str, source_signal: str, position_index: int) -> eager.PathWaveformSeries:
+    def read(
+        self,
+        *,
+        subject_id: str,
+        source_signal: str,
+        position_index: int,
+    ) -> eager.PathWaveformSeries:
         if self._local is not None:
             return self._local.read(
                 subject_id=subject_id,
@@ -110,7 +154,8 @@ class HybridPathWaveformReader:
         eager._subject_number(subject_id)
         if source_signal not in self._spec.signals:
             raise CapabilityError(
-                f"artifact {self._spec.artifact_id!r} does not contain path signal {source_signal!r}"
+                f"artifact {self._spec.artifact_id!r} does not contain path signal "
+                f"{source_signal!r}"
             )
         if isinstance(position_index, bool) or not isinstance(position_index, int):
             raise TypeError("position_index must be an integer")
@@ -125,7 +170,12 @@ class HybridPathWaveformReader:
                 f"0..{int(distances.size) - 1} for {self._spec.canonical_path_id!r}"
             )
 
-        wave = self._waveform_payload(subject_id, source_signal, position_index, index)
+        wave = self._waveform_payload(
+            subject_id,
+            source_signal,
+            position_index,
+            index,
+        )
         values = np.asarray(wave["values"], dtype=np.float64)
         fs = float(index["sample_rate_hz"])
         python_values = tuple(float(value) for value in values)
@@ -145,13 +195,36 @@ class HybridPathWaveformReader:
             source_access_mode="zenodo_manifest_pinned_http_range",
         )
 
+    def close(self) -> None:
+        """Release a live remote HDF5 session while retaining persistent caches."""
+
+        with self._remote_lock:
+            handle = self._remote_handle
+            remote = self._remote_reader
+            self._remote_handle = None
+            self._remote_reader = None
+            try:
+                if handle is not None:
+                    handle.close()
+            finally:
+                if remote is not None:
+                    self._collect_remote_stats(remote)
+                    remote.close()
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            # Destructors must not mask interpreter shutdown or user exceptions.
+            pass
+
     def _remote_metadata(self) -> RemoteFileMetadata:
         if self._metadata is None:
             assert isinstance(self._source, CanonicalRemoteFile)
             self._metadata = verify_zenodo_file_identity(self._source)
         return self._metadata
 
-    def _open_remote(self):
+    def _open_remote(self) -> HTTPRangeReader:
         assert isinstance(self._source, CanonicalRemoteFile)
         metadata = self._remote_metadata()
         remote = HTTPRangeReader(
@@ -162,6 +235,24 @@ class HybridPathWaveformReader:
         )
         self._remote_opens += 1
         return remote
+
+    def _remote_session(self) -> tuple[HTTPRangeReader, Any]:
+        remote = self._remote_reader
+        handle = self._remote_handle
+        if remote is not None and handle is not None:
+            return remote, handle
+
+        h5py = eager._h5py_module()
+        remote = self._open_remote()
+        try:
+            handle = h5py.File(remote, "r")
+        except Exception:
+            self._collect_remote_stats(remote)
+            remote.close()
+            raise
+        self._remote_reader = remote
+        self._remote_handle = handle
+        return remote, handle
 
     def _collect_remote_stats(self, remote: HTTPRangeReader) -> None:
         self._bytes_transferred += remote.bytes_transferred
@@ -199,72 +290,105 @@ class HybridPathWaveformReader:
             else:
                 self._loaded_indexes[subject_id] = payload
                 return payload
-        payload = self._build_index(subject_id)
-        self._write_index(path, subject_id, payload)
-        self._loaded_indexes[subject_id] = payload
-        return payload
+
+        with self._remote_lock:
+            # Another thread may have populated the cache while this caller waited.
+            if path.is_file():
+                try:
+                    payload = self._load_index(path, subject_id)
+                except (OSError, ValueError, KeyError, RuntimeError):
+                    try:
+                        path.unlink()
+                    except OSError:
+                        pass
+                else:
+                    self._loaded_indexes[subject_id] = payload
+                    return payload
+            payload = self._build_index(subject_id)
+            self._write_index(path, subject_id, payload)
+            self._loaded_indexes[subject_id] = payload
+            return payload
 
     def _build_index(self, subject_id: str) -> dict[str, Any]:
         subject_number = eager._subject_number(subject_id)
         h5py = eager._h5py_module()
-        remote = self._open_remote()
         try:
-            with remote:
-                with h5py.File(remote, "r") as handle:
-                    if "data" not in handle or "path_waves" not in handle["data"]:
-                        raise SchemaError("canonical path MAT lacks /data/path_waves")
-                    path_waves = handle["data"]["path_waves"]
-                    if self._spec.source_path_id not in path_waves:
-                        raise SchemaError(
-                            f"canonical path MAT lacks source path {self._spec.source_path_id!r}"
-                        )
-                    group = path_waves[self._spec.source_path_id]
-                    if "dist" not in group:
-                        raise SchemaError("canonical path group lacks spatial distance data")
-                    distance_ref = eager._subject_ref(h5py, group["dist"], subject_number)
-                    distance_dataset = handle[distance_ref]
-                    distances = eager._bounded_numeric(h5py, distance_dataset)
-                    if distances.size < 1 or not bool(np.isfinite(distances).all()):
-                        raise SchemaError("canonical path distances are empty or non-finite")
-                    fs = eager._numeric_scalar(
-                        h5py, handle, path_waves["fs"], "/data/path_waves/fs"
+            _remote, handle = self._remote_session()
+            if "data" not in handle or "path_waves" not in handle["data"]:
+                raise SchemaError("canonical path MAT lacks /data/path_waves")
+            path_waves = handle["data"]["path_waves"]
+            if self._spec.source_path_id not in path_waves:
+                raise SchemaError(
+                    f"canonical path MAT lacks source path {self._spec.source_path_id!r}"
+                )
+            group = path_waves[self._spec.source_path_id]
+            if "dist" not in group:
+                raise SchemaError("canonical path group lacks spatial distance data")
+            distance_ref = eager._subject_ref(h5py, group["dist"], subject_number)
+            distance_dataset = handle[distance_ref]
+            distances = eager._bounded_numeric(h5py, distance_dataset)
+            if distances.size < 1 or not bool(np.isfinite(distances).all()):
+                raise SchemaError("canonical path distances are empty or non-finite")
+            fs = eager._numeric_scalar(
+                h5py,
+                handle,
+                path_waves["fs"],
+                "/data/path_waves/fs",
+            )
+            if not math.isfinite(fs) or fs <= 0:
+                raise SchemaError(
+                    "canonical path sample rate is not positive and finite"
+                )
+            payload: dict[str, Any] = {
+                "distances": distances.copy(),
+                "distance_dataset": distance_dataset.name,
+                "sample_rate_hz": fs,
+            }
+            position_count = int(distances.size)
+            for signal in self._spec.signals:
+                if signal not in group:
+                    raise SchemaError(
+                        f"canonical path group {self._spec.source_path_id!r} lacks "
+                        f"signal {signal!r}"
                     )
-                    if not math.isfinite(fs) or fs <= 0:
-                        raise SchemaError("canonical path sample rate is not positive and finite")
-                    payload: dict[str, Any] = {
-                        "distances": distances.copy(),
-                        "distance_dataset": distance_dataset.name,
-                        "sample_rate_hz": fs,
-                    }
-                    position_count = int(distances.size)
-                    for signal in self._spec.signals:
-                        if signal not in group:
-                            raise SchemaError(
-                                f"canonical path group {self._spec.source_path_id!r} lacks signal {signal!r}"
-                            )
-                        subject_ref = eager._subject_ref(h5py, group[signal], subject_number)
-                        subject_cell = handle[subject_ref]
-                        if not isinstance(subject_cell, h5py.Dataset) or not eager._is_reference_dataset(h5py, subject_cell):
-                            raise SchemaError(
-                                f"subject {subject_number} path signal {signal!r} is not a MATLAB cell-reference dataset"
-                            )
-                        if int(subject_cell.size) != position_count:
-                            raise SchemaError(
-                                f"path signal {signal!r} has {int(subject_cell.size)} positions but distance has {position_count}"
-                            )
-                        payload[f"{signal}_subject_cell"] = subject_cell.name
+                subject_ref = eager._subject_ref(
+                    h5py,
+                    group[signal],
+                    subject_number,
+                )
+                subject_cell = handle[subject_ref]
+                if (
+                    not isinstance(subject_cell, h5py.Dataset)
+                    or not eager._is_reference_dataset(h5py, subject_cell)
+                ):
+                    raise SchemaError(
+                        f"subject {subject_number} path signal {signal!r} is not a "
+                        "MATLAB cell-reference dataset"
+                    )
+                if int(subject_cell.size) != position_count:
+                    raise SchemaError(
+                        f"path signal {signal!r} has {int(subject_cell.size)} positions "
+                        f"but distance has {position_count}"
+                    )
+                payload[f"{signal}_subject_cell"] = subject_cell.name
+            return payload
         except (OSError, RuntimeError) as exc:
+            self.close()
+            assert isinstance(self._source, CanonicalRemoteFile)
             raise IntegrityError(
-                f"unable to build sparse path index from canonical artifact {self._source.url}"
+                "unable to build sparse path index from canonical artifact "
+                f"{self._source.url}"
             ) from exc
-        finally:
-            self._collect_remote_stats(remote)
-        return payload
 
     def _position_ref(self, dataset: Any, position: int, position_count: int):
         h5py = eager._h5py_module()
-        if not isinstance(dataset, h5py.Dataset) or not eager._is_reference_dataset(h5py, dataset):
-            raise SchemaError("cached subject-cell path no longer resolves to a reference dataset")
+        if (
+            not isinstance(dataset, h5py.Dataset)
+            or not eager._is_reference_dataset(h5py, dataset)
+        ):
+            raise SchemaError(
+                "cached subject-cell path no longer resolves to a reference dataset"
+            )
         axes = [axis for axis, size in enumerate(dataset.shape) if size == position_count]
         if len(axes) != 1:
             raise SchemaError(
@@ -275,7 +399,8 @@ class HybridPathWaveformReader:
         ref = dataset[tuple(index)]
         if not ref:
             raise SchemaError(
-                f"{dataset.name} contains a null waveform reference at position {position}"
+                f"{dataset.name} contains a null waveform reference at position "
+                f"{position}"
             )
         return ref
 
@@ -296,40 +421,54 @@ class HybridPathWaveformReader:
                 except OSError:
                     pass
 
-        h5py = eager._h5py_module()
-        remote = self._open_remote()
-        try:
-            with remote:
-                with h5py.File(remote, "r") as handle:
-                    subject_cell_path = str(index[f"{signal}_subject_cell"])
-                    if subject_cell_path not in handle:
-                        raise SchemaError(
-                            f"cached subject-cell dataset {subject_cell_path!r} is absent"
-                        )
-                    subject_cell = handle[subject_cell_path]
-                    position_count = int(np.asarray(index["distances"]).size)
-                    ref = self._position_ref(subject_cell, position, position_count)
-                    dataset = handle[ref]
-                    values = eager._bounded_numeric(h5py, dataset)
-                    payload = {
-                        "values": values.copy(),
-                        "source_dataset": dataset.name,
-                    }
-        except (OSError, RuntimeError) as exc:
-            raise IntegrityError(
-                f"unable to read sparse canonical waveform from {self._source.url}"
-            ) from exc
-        finally:
-            self._collect_remote_stats(remote)
-        self._write_wave(path, subject_id, signal, position, payload)
-        return payload
+        with self._remote_lock:
+            # Avoid duplicate remote reads if another thread filled this cache entry.
+            if path.is_file():
+                try:
+                    return self._load_wave(path, subject_id, signal, position)
+                except (OSError, ValueError, KeyError, RuntimeError):
+                    try:
+                        path.unlink()
+                    except OSError:
+                        pass
+
+            h5py = eager._h5py_module()
+            try:
+                _remote, handle = self._remote_session()
+                subject_cell_path = str(index[f"{signal}_subject_cell"])
+                if subject_cell_path not in handle:
+                    raise SchemaError(
+                        f"cached subject-cell dataset {subject_cell_path!r} is absent"
+                    )
+                subject_cell = handle[subject_cell_path]
+                position_count = int(np.asarray(index["distances"]).size)
+                ref = self._position_ref(subject_cell, position, position_count)
+                dataset = handle[ref]
+                values = eager._bounded_numeric(h5py, dataset)
+                payload = {
+                    "values": values.copy(),
+                    "source_dataset": dataset.name,
+                }
+            except (OSError, RuntimeError) as exc:
+                self.close()
+                assert isinstance(self._source, CanonicalRemoteFile)
+                raise IntegrityError(
+                    "unable to read sparse canonical waveform from "
+                    f"{self._source.url}"
+                ) from exc
+            self._write_wave(path, subject_id, signal, position, payload)
+            return payload
 
     def _atomic_npz(self, path: Path, fields: dict[str, Any]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary: Path | None = None
         try:
             with tempfile.NamedTemporaryFile(
-                "wb", dir=path.parent, prefix=f"{path.name}.", suffix=".tmp", delete=False
+                "wb",
+                dir=path.parent,
+                prefix=f"{path.name}.",
+                suffix=".tmp",
+                delete=False,
             ) as handle:
                 temporary = Path(handle.name)
                 np.savez(handle, **fields)
@@ -341,7 +480,12 @@ class HybridPathWaveformReader:
             if temporary is not None and temporary.exists():
                 temporary.unlink()
 
-    def _write_index(self, path: Path, subject_id: str, payload: dict[str, Any]) -> None:
+    def _write_index(
+        self,
+        path: Path,
+        subject_id: str,
+        payload: dict[str, Any],
+    ) -> None:
         fields: dict[str, Any] = {
             "cache_version": np.asarray(_REMOTE_INDEX_VERSION, dtype=np.int64),
             "artifact_id": np.asarray(self._spec.artifact_id),
@@ -350,10 +494,15 @@ class HybridPathWaveformReader:
             "subject_id": np.asarray(subject_id),
             "distances": np.asarray(payload["distances"], dtype=np.float64),
             "distance_dataset": np.asarray(str(payload["distance_dataset"])),
-            "sample_rate_hz": np.asarray(float(payload["sample_rate_hz"]), dtype=np.float64),
+            "sample_rate_hz": np.asarray(
+                float(payload["sample_rate_hz"]),
+                dtype=np.float64,
+            ),
         }
         for signal in self._spec.signals:
-            fields[f"{signal}_subject_cell"] = np.asarray(str(payload[f"{signal}_subject_cell"]))
+            fields[f"{signal}_subject_cell"] = np.asarray(
+                str(payload[f"{signal}_subject_cell"])
+            )
         self._atomic_npz(path, fields)
 
     def _load_index(self, path: Path, subject_id: str) -> dict[str, Any]:
@@ -362,22 +511,38 @@ class HybridPathWaveformReader:
                 raise RuntimeError("remote index version changed")
             if eager._scalar_text(data["artifact_id"]) != self._spec.artifact_id:
                 raise RuntimeError("remote index artifact changed")
-            if eager._scalar_text(data["source_checksum"]).lower() != self._source_checksum:
+            if (
+                eager._scalar_text(data["source_checksum"]).lower()
+                != self._source_checksum
+            ):
                 raise RuntimeError("remote index canonical checksum changed")
-            if eager._scalar_text(data["canonical_path_id"]) != self._spec.canonical_path_id:
+            if (
+                eager._scalar_text(data["canonical_path_id"])
+                != self._spec.canonical_path_id
+            ):
                 raise RuntimeError("remote index path changed")
             if eager._scalar_text(data["subject_id"]) != subject_id:
                 raise RuntimeError("remote index subject changed")
             payload: dict[str, Any] = {
-                "distances": np.asarray(data["distances"], dtype=np.float64).copy(),
+                "distances": np.asarray(
+                    data["distances"],
+                    dtype=np.float64,
+                ).copy(),
                 "distance_dataset": eager._scalar_text(data["distance_dataset"]),
                 "sample_rate_hz": float(data["sample_rate_hz"].item()),
             }
             for signal in self._spec.signals:
-                payload[f"{signal}_subject_cell"] = eager._scalar_text(data[f"{signal}_subject_cell"])
-        if payload["distances"].size < 1 or not bool(np.isfinite(payload["distances"]).all()):
+                payload[f"{signal}_subject_cell"] = eager._scalar_text(
+                    data[f"{signal}_subject_cell"]
+                )
+        if payload["distances"].size < 1 or not bool(
+            np.isfinite(payload["distances"]).all()
+        ):
             raise RuntimeError("remote index distances invalid")
-        if not math.isfinite(payload["sample_rate_hz"]) or payload["sample_rate_hz"] <= 0:
+        if (
+            not math.isfinite(payload["sample_rate_hz"])
+            or payload["sample_rate_hz"] <= 0
+        ):
             raise RuntimeError("remote index sample rate invalid")
         return payload
 
@@ -415,7 +580,10 @@ class HybridPathWaveformReader:
                 raise RuntimeError("remote waveform cache version changed")
             if eager._scalar_text(data["artifact_id"]) != self._spec.artifact_id:
                 raise RuntimeError("remote waveform artifact changed")
-            if eager._scalar_text(data["source_checksum"]).lower() != self._source_checksum:
+            if (
+                eager._scalar_text(data["source_checksum"]).lower()
+                != self._source_checksum
+            ):
                 raise RuntimeError("remote waveform canonical checksum changed")
             if eager._scalar_text(data["subject_id"]) != subject_id:
                 raise RuntimeError("remote waveform subject changed")
