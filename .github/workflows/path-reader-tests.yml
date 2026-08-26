@@ -1,8 +1,6 @@
 name: Path Reader Tests
 
 on:
-  push:
-    branches: [build/batch-9-production-path-reader]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -11,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: path-reader-tests-${{ github.workflow }}-${{ github.ref }}
+  group: path-reader-tests-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -43,6 +41,7 @@ jobs:
     timeout-minutes: 90
     strategy:
       fail-fast: false
+      max-parallel: 3
       matrix:
         artifact:
           - path_aorta_brain
