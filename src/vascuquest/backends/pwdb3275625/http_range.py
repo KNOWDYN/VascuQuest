@@ -12,7 +12,9 @@ from dataclasses import dataclass
 import io
 import json
 import re
+import time
 from typing import Any, Callable
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from vascuquest.errors import IntegrityError
@@ -20,6 +22,8 @@ from vascuquest.errors import IntegrityError
 _CONTENT_RANGE = re.compile(r"^bytes (\d+)-(\d+)/(\d+)$")
 _DEFAULT_BLOCK_SIZE = 2 * 1024 * 1024
 _DEFAULT_MAX_BLOCKS = 32
+_TRANSIENT_HTTP_STATUS = frozenset({408, 429, 500, 502, 503, 504})
+_RETRY_DELAYS_SECONDS = (1.0, 3.0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,11 +66,37 @@ class RemoteFileMetadata:
             raise ValueError("size_bytes must be positive")
 
 
-def _call_opener(opener: Callable[..., Any], request: Request):
+def _open_once(opener: Callable[..., Any], request: Request):
     try:
         return opener(request, timeout=60)
     except TypeError:
         return opener(request)
+
+
+def _call_opener(opener: Callable[..., Any], request: Request):
+    """Open one exact request with bounded retries for transient transport failures.
+
+    Retries reuse the same ``Request`` object, including an existing ``Range``
+    header. They never remove or broaden a byte range and never fall back to an
+    unbounded whole-file transfer.
+    """
+
+    for attempt in range(len(_RETRY_DELAYS_SECONDS) + 1):
+        try:
+            return _open_once(opener, request)
+        except HTTPError as exc:
+            retryable = exc.code in _TRANSIENT_HTTP_STATUS
+            try:
+                exc.close()
+            except Exception:
+                pass
+            if not retryable or attempt >= len(_RETRY_DELAYS_SECONDS):
+                raise
+        except (URLError, TimeoutError, ConnectionError):
+            if attempt >= len(_RETRY_DELAYS_SECONDS):
+                raise
+        time.sleep(_RETRY_DELAYS_SECONDS[attempt])
+    raise AssertionError("unreachable HTTP retry state")
 
 
 def _normalise_checksum(raw: str) -> tuple[str, str]:
