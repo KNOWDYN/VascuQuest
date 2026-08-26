@@ -14,10 +14,10 @@ from vascuquest.schema import CanonicalManifest, CanonicalSchema, load_manifest
 
 from .backend import ArtifactResolver, PWDB3275625Backend
 from .http_range import CanonicalRemoteFile
+from .lazy_path_reader import HybridPathWaveformReader
 from .path_reader import (
     PATH_ARTIFACT_SPECS,
     PATH_CAPABILITIES,
-    PathWaveformReader,
     artifact_id_for_path_signal,
 )
 
@@ -28,7 +28,8 @@ _PATH_CACHE_PROVENANCE = (
 _REMOTE_RANGE_PROVENANCE = (
     "large canonical PWDB path artifacts may be accessed through bounded HTTP byte ranges "
     "after Zenodo record metadata is matched to the manifest-pinned filename, size and checksum; "
-    "the full remote file is not rehashed on every sparse read"
+    "remote reads use a derived subject index and exact per-position waveform cache, and the full "
+    "remote file is not downloaded or rehashed on every sparse read"
 )
 
 
@@ -50,7 +51,7 @@ class PWDB3275625PathBackend(PWDB3275625Backend):
         if not isinstance(resolved_root, Path):
             raise TypeError("derived_root must be a pathlib.Path or None")
         self._derived_root = resolved_root
-        self._path_readers: dict[str, PathWaveformReader] = {}
+        self._path_readers: dict[str, HybridPathWaveformReader] = {}
 
     @classmethod
     def from_acquirer(
@@ -166,7 +167,7 @@ class PWDB3275625PathBackend(PWDB3275625Backend):
             padding_mask=series.padding_mask,
         )
 
-    def _path_reader(self, artifact_id: str) -> PathWaveformReader:
+    def _path_reader(self, artifact_id: str) -> HybridPathWaveformReader:
         cached = self._path_readers.get(artifact_id)
         if cached is not None:
             return cached
@@ -181,7 +182,7 @@ class PWDB3275625PathBackend(PWDB3275625Backend):
             artifact = self._manifest.artifact(artifact_id)
         except KeyError as exc:
             raise SchemaError(f"canonical manifest lacks path artifact {artifact_id!r}") from exc
-        reader = PathWaveformReader(
+        reader = HybridPathWaveformReader(
             source,
             self._derived_root,
             spec,
