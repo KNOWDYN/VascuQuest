@@ -22,6 +22,9 @@ from vascuquest.errors import IntegrityError
 _CONTENT_RANGE = re.compile(r"^bytes (\d+)-(\d+)/(\d+)$")
 _DEFAULT_BLOCK_SIZE = 2 * 1024 * 1024
 _DEFAULT_MAX_BLOCKS = 32
+_LARGE_FILE_THRESHOLD_BYTES = 1024 * 1024 * 1024
+_LARGE_FILE_MIN_BLOCK_SIZE = 2 * 1024 * 1024
+_LARGE_FILE_MAX_BLOCKS = 32
 _TRANSIENT_HTTP_STATUS = frozenset({408, 429, 500, 502, 503, 504})
 _RETRY_DELAYS_SECONDS = (1.0, 3.0)
 
@@ -224,10 +227,15 @@ class HTTPRangeReader(io.RawIOBase):
                 raise TypeError(f"{name} must be an integer")
             if value <= 0:
                 raise ValueError(f"{name} must be positive")
+        effective_block_size = block_size
+        effective_max_blocks = max_blocks
+        if size_bytes >= _LARGE_FILE_THRESHOLD_BYTES:
+            effective_block_size = max(block_size, _LARGE_FILE_MIN_BLOCK_SIZE)
+            effective_max_blocks = min(max_blocks, _LARGE_FILE_MAX_BLOCKS)
         self._url = url
         self._size = size_bytes
-        self._block_size = block_size
-        self._max_blocks = max_blocks
+        self._block_size = effective_block_size
+        self._max_blocks = effective_max_blocks
         self._opener = urlopen if opener is None else opener
         self._position = 0
         self._cache: OrderedDict[int, bytes] = OrderedDict()
@@ -237,6 +245,14 @@ class HTTPRangeReader(io.RawIOBase):
     @property
     def size_bytes(self) -> int:
         return self._size
+
+    @property
+    def block_size(self) -> int:
+        return self._block_size
+
+    @property
+    def max_blocks(self) -> int:
+        return self._max_blocks
 
     @property
     def bytes_transferred(self) -> int:
