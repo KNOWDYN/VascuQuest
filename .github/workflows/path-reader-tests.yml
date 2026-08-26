@@ -35,10 +35,21 @@ jobs:
           tests/integration/test_batch9_path_reader.py
           tests/cli/test_cli_safety.py
 
-  remote-hdf5-profile:
-    name: Remote HDF5 operation profile
+  sparse-tier4:
+    name: Tier-4 / ${{ matrix.artifact }}
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        artifact:
+          - path_aorta_brain
+          - path_aorta_finger
+          - path_aorta_foot_a
+          - path_aorta_foot_p
+          - path_aorta_foot_u
+          - path_aorta_rsubclavian
     env:
       PYTHONUNBUFFERED: '1'
     steps:
@@ -51,16 +62,22 @@ jobs:
           cache: pip
       - name: Install package with path support
         run: python -m pip install '.[path]'
-      - name: Compile profiler and canonical validator
-        run: >-
-          python -m py_compile
-          tests/full_data/path_release_validation.py
-          tests/full_data/path_remote_profile.py
-      - name: Profile canonical path_aorta_brain traversal
+      - name: Compile Tier-4 validator
+        run: python -m py_compile tests/full_data/path_release_validation.py
+      - name: Validate canonical path artifact without full download
         env:
-          XDG_DATA_HOME: ${{ runner.temp }}/vascuquest-profile/data
-          XDG_CACHE_HOME: ${{ runner.temp }}/vascuquest-profile/cache
-          XDG_STATE_HOME: ${{ runner.temp }}/vascuquest-profile/state
+          XDG_DATA_HOME: ${{ runner.temp }}/vascuquest-tier4/data
+          XDG_CACHE_HOME: ${{ runner.temp }}/vascuquest-tier4/cache
+          XDG_STATE_HOME: ${{ runner.temp }}/vascuquest-tier4/state
         run: >-
-          python tests/full_data/path_remote_profile.py
-          --artifact-id path_aorta_brain
+          python tests/full_data/path_release_validation.py
+          --artifact-id "${{ matrix.artifact }}"
+          --report "reports/${{ matrix.artifact }}.json"
+      - name: Upload Tier-4 report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: tier4-${{ matrix.artifact }}
+          path: reports/${{ matrix.artifact }}.json
+          if-no-files-found: ignore
+          retention-days: 14
