@@ -67,6 +67,18 @@ def test_http_range_reader_reads_only_requested_blocks_and_seeks() -> None:
         assert all(request.startswith("bytes=") for request in requests)
 
 
+def test_multi_gigabyte_reader_uses_two_megabyte_ranges_with_bounded_cache() -> None:
+    reader = HTTPRangeReader(
+        "https://example.test/pwdb-path.mat",
+        size_bytes=6 * 1024 * 1024 * 1024,
+        block_size=64 * 1024,
+        max_blocks=256,
+        opener=lambda request, timeout=0: None,
+    )
+    assert reader.block_size == 2 * 1024 * 1024
+    assert reader.max_blocks == 32
+
+
 def test_http_range_reader_retries_same_range_after_transient_504(monkeypatch: pytest.MonkeyPatch) -> None:
     payload = bytes(range(32))
     ranges: list[str] = []
