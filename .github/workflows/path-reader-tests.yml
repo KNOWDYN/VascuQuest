@@ -53,9 +53,6 @@ jobs:
           - path_aorta_rsubclavian
     env:
       PYTHONUNBUFFERED: '1'
-      XDG_DATA_HOME: ${{ runner.temp }}/vascuquest-tier4/data
-      XDG_CACHE_HOME: ${{ runner.temp }}/vascuquest-tier4/cache
-      XDG_STATE_HOME: ${{ runner.temp }}/vascuquest-tier4/state
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -69,6 +66,10 @@ jobs:
       - name: Compile Tier-4 validator
         run: python -m py_compile tests/full_data/path_release_validation.py
       - name: Validate canonical path artifact without full download
+        env:
+          XDG_DATA_HOME: ${{ runner.temp }}/vascuquest-tier4/data
+          XDG_CACHE_HOME: ${{ runner.temp }}/vascuquest-tier4/cache
+          XDG_STATE_HOME: ${{ runner.temp }}/vascuquest-tier4/state
         run: >-
           python tests/full_data/path_release_validation.py
           --artifact-id "${{ matrix.artifact }}"
