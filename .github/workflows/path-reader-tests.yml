@@ -38,11 +38,24 @@ jobs:
           tests/cli/test_cli_safety.py
 
   sparse-tier4:
-    name: Sparse canonical Tier-4
+    name: Tier-4 / ${{ matrix.artifact }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        artifact:
+          - path_aorta_brain
+          - path_aorta_finger
+          - path_aorta_foot_a
+          - path_aorta_foot_p
+          - path_aorta_foot_u
+          - path_aorta_rsubclavian
     env:
       PYTHONUNBUFFERED: '1'
+      XDG_DATA_HOME: ${{ runner.temp }}/vascuquest-tier4/data
+      XDG_CACHE_HOME: ${{ runner.temp }}/vascuquest-tier4/cache
+      XDG_STATE_HOME: ${{ runner.temp }}/vascuquest-tier4/state
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -55,31 +68,16 @@ jobs:
         run: python -m pip install '.[path]'
       - name: Compile Tier-4 validator
         run: python -m py_compile tests/full_data/path_release_validation.py
-      - name: Validate all six canonical path artifacts without full downloads
-        env:
-          XDG_DATA_HOME: ${{ runner.temp }}/vascuquest-tier4/data
-          XDG_CACHE_HOME: ${{ runner.temp }}/vascuquest-tier4/cache
-          XDG_STATE_HOME: ${{ runner.temp }}/vascuquest-tier4/state
-        run: |
-          set -euo pipefail
-          for artifact in \
-            path_aorta_brain \
-            path_aorta_finger \
-            path_aorta_foot_a \
-            path_aorta_foot_p \
-            path_aorta_foot_u \
-            path_aorta_rsubclavian
-          do
-            echo "=== Validating ${artifact} ==="
-            python tests/full_data/path_release_validation.py \
-              --artifact-id "${artifact}" \
-              --report "reports/${artifact}.json"
-          done
-      - name: Upload Tier-4 reports
+      - name: Validate canonical path artifact without full download
+        run: >-
+          python tests/full_data/path_release_validation.py
+          --artifact-id "${{ matrix.artifact }}"
+          --report "reports/${{ matrix.artifact }}.json"
+      - name: Upload Tier-4 report
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: path-tier4-reports
-          path: reports/*.json
+          name: tier4-${{ matrix.artifact }}
+          path: reports/${{ matrix.artifact }}.json
           if-no-files-found: ignore
           retention-days: 14
