@@ -63,14 +63,17 @@ jobs:
       - name: Install package with path support
         run: python -m pip install '.[path]'
       - name: Compile Tier-4 validator
-        run: python -m py_compile tests/full_data/path_release_validation.py
+        run: >-
+          python -m py_compile
+          tests/full_data/path_release_validation.py
+          tests/full_data/path_release_validation_fast.py
       - name: Validate canonical path artifact without full download
         env:
           XDG_DATA_HOME: ${{ runner.temp }}/vascuquest-tier4/data
           XDG_CACHE_HOME: ${{ runner.temp }}/vascuquest-tier4/cache
           XDG_STATE_HOME: ${{ runner.temp }}/vascuquest-tier4/state
         run: >-
-          python tests/full_data/path_release_validation.py
+          python tests/full_data/path_release_validation_fast.py
           --artifact-id "${{ matrix.artifact }}"
           --report "reports/${{ matrix.artifact }}.json"
       - name: Upload Tier-4 report
