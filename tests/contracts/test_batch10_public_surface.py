@@ -18,4 +18,4 @@ def test_open_dataset_status_keeps_path_capability_explicitly_deferred():
     status = session.status()
     assert status.identity.record_id == "3275625"
     assert status.path_resolved_supported is False
-    assert status.path_validation_state == "unavailable_pending_batch8_tier3_validation"
+    assert status.path_validation_state == "unavailable_not_in_release_scope"
