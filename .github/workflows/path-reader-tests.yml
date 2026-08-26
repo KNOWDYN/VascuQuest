@@ -38,7 +38,7 @@ jobs:
   remote-hdf5-profile:
     name: Remote HDF5 operation profile
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 6
     env:
       PYTHONUNBUFFERED: '1'
     steps:
