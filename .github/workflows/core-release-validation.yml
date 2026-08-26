@@ -1,6 +1,8 @@
 name: Core release validation
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -8,6 +10,7 @@ permissions:
 
 jobs:
   tier4-core:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release/')
     name: PWDB core Tier-4 / Python 3.12
     runs-on: ubuntu-24.04
     timeout-minutes: 45

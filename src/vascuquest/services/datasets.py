@@ -67,7 +67,7 @@ class DatasetService:
             path_validation_state=(
                 "validated_and_available"
                 if path_supported
-                else "unavailable_pending_batch8_tier3_validation"
+                else "unavailable_not_in_release_scope"
             ),
         )
 

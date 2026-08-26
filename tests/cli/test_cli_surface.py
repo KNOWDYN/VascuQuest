@@ -55,7 +55,7 @@ def test_frozen_command_tree_and_global_version() -> None:
 
     version = runner.invoke(app, ["--version"])
     assert version.exit_code == 0
-    assert version.output.strip() == "0.1.0.dev0"
+    assert version.output.strip() == "0.1.0"
 
 
 def test_metadata_machine_output_is_clean_and_parseable() -> None:

@@ -148,7 +148,7 @@ def test_open_dataset_is_lightweight_and_reports_path_deferred():
     assert session.identity.record_id == "3275625"
     status = session.status()
     assert status.path_resolved_supported is False
-    assert status.path_validation_state == "unavailable_pending_batch8_tier3_validation"
+    assert status.path_validation_state == "unavailable_not_in_release_scope"
 
 
 def test_core_session_routes_subject_selection_retrieval_and_source_reproduction():
