@@ -222,7 +222,7 @@ Do not replace the PWDB citation with the VascuQuest software citation when repo
 
 VascuQuest software is distributed under the **Apache License 2.0**; see [`LICENSE`](LICENSE).
 
-PWDB is external data. VascuQuest does not bundle, re-host or relicense the canonical PWDB source artifacts.
+PWDB is external data. VascuQuest does not bundle or re-host the canonical PWDB source artifacts and **does not relicense the source dataset**.
 
 ## Documentation
 
