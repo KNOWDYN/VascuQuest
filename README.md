@@ -6,6 +6,7 @@
 [![Python 3.11–3.14](https://img.shields.io/badge/Python-3.11%E2%80%933.14-blue.svg)](https://www.python.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-green.svg)](LICENSE)
 [![Version: 0.1.0](https://img.shields.io/badge/version-0.1.0-blue.svg)](CHANGELOG.md)
+[![VascuQuest DOI](https://img.shields.io/badge/DOI-10.13140%2FRG.2.2.26784.96004-blue.svg)](https://doi.org/10.13140/RG.2.2.26784.96004)
 [![PWDB source DOI](https://img.shields.io/badge/PWDB-10.5281%2Fzenodo.3275625-blue.svg)](https://doi.org/10.5281/zenodo.3275625)
 
 VascuQuest is a Python package and command-line interface for **research-grade access to the Pulse Wave DataBase (PWDB)**. The canonical PWDB Zenodo record [`3275625`](https://zenodo.org/records/3275625) remains the upstream source of truth; VascuQuest provides a verified scientific interface around it.
@@ -208,7 +209,7 @@ A request for an unsupported capability fails explicitly; it is never silently r
 
 ## Citation
 
-For the software, use the repository citation metadata in [`CITATION.cff`](CITATION.cff). If the release later receives an archival software DOI, that DOI supersedes the repository URL as the preferred software identifier.
+For the software, cite **VascuQuest 0.1.0** using DOI [`10.13140/RG.2.2.26784.96004`](https://doi.org/10.13140/RG.2.2.26784.96004). The same identifier is recorded in [`CITATION.cff`](CITATION.cff) for citation-aware tools.
 
 Research using PWDB source data should also cite the canonical upstream dataset:
 
