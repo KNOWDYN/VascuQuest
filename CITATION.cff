@@ -4,11 +4,12 @@ title: "VascuQuest"
 type: software
 version: 0.1.0
 date-released: 2026-08-26
+doi: "10.13140/RG.2.2.26784.96004"
 authors:
   - family-names: "Saqr"
     given-names: "Khalid M."
 repository-code: "https://github.com/KNOWDYN/VascuQuest"
-url: "https://github.com/KNOWDYN/VascuQuest"
+url: "https://doi.org/10.13140/RG.2.2.26784.96004"
 license: Apache-2.0
 keywords:
   - haemodynamics
