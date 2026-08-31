@@ -3,11 +3,9 @@
 The same canonical PWDB subject is used for all four frozen disease conditions.
 For every transformed network, the NumPy and JAX RHS/stability operators are
 compared on the same deterministic non-trivial state. All four cases then run
-to periodic convergence with JAX. One coarse-network stiffening case is also
-solved end-to-end with the frozen NumPy reference and compared across the full
-116-segment final cycle. The benchmark is reported separately from correctness.
-
-This is software/mechanistic qualification, not clinical validation.
+to periodic convergence with JAX. One large-artery-stiffening case is also
+solved end-to-end with the frozen NumPy reference and compared across all 116
+segments. This is software/mechanistic qualification, not clinical validation.
 """
 
 from __future__ import annotations
@@ -42,7 +40,6 @@ from vascuquest.disease.solver.jax_disease import (
 from vascuquest.disease.solver.model import SolverOptions
 from vascuquest.disease.solver.network import build_network
 
-
 OPERATOR_RELATIVE_L2_LIMIT = 1e-8
 OPERATOR_MAX_SCALED_LIMIT = 5e-8
 STABILITY_RELATIVE_LIMIT = 1e-8
@@ -56,7 +53,10 @@ SEED = 17031
 
 def _write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
 
 
 def _acquisition(source: Path) -> ArtifactAcquirer:
@@ -67,7 +67,17 @@ def _acquisition(source: Path) -> ArtifactAcquirer:
 
 
 def _rank(subject_id: str) -> bytes:
-    return hashlib.sha256(f"{SEED}\0jax-qualification\0{subject_id}".encode()).digest()
+    return hashlib.sha256(
+        f"{SEED}\0jax-qualification\0{subject_id}".encode("utf-8")
+    ).digest()
+
+
+def _spec_payload(spec) -> dict[str, object]:
+    return {
+        "condition": spec.condition.value,
+        "parameters": dict(spec.parameters),
+        "preset_version": spec.preset_version,
+    }
 
 
 def _case_specifications(baseline, options: SolverOptions):
@@ -131,7 +141,7 @@ def _select_subject(session, assembler, options: SolverOptions):
         if int(round(age)) in {45, 55}
     ]
     candidates.sort(key=lambda item: (_rank(item[0]), item[0]))
-    rejections = []
+    rejections: list[dict[str, object]] = []
     for subject_id, age in candidates:
         baseline = assembler.assemble(session, subject_id)
         try:
@@ -150,7 +160,9 @@ def _select_subject(session, assembler, options: SolverOptions):
             )
             continue
         return baseline, cases, physics, rejections
-    raise RuntimeError("no age-45/55 PWDB subject was admissible for all four qualification cases")
+    raise RuntimeError(
+        "no age-45/55 PWDB subject was admissible for all four qualification cases"
+    )
 
 
 def _deterministic_state(baseline, network):
@@ -179,9 +191,10 @@ def _relative_metrics(reference: np.ndarray, candidate: np.ndarray):
     if ref.shape != got.shape:
         raise AssertionError(f"operator shape mismatch: {ref.shape} != {got.shape}")
     diff = got - ref
-    relative_l2 = float(np.linalg.norm(diff) / max(np.linalg.norm(ref), 1e-30))
-    max_scaled = float(np.max(np.abs(diff)) / max(np.max(np.abs(ref)), 1e-30))
-    return relative_l2, max_scaled
+    return (
+        float(np.linalg.norm(diff) / max(np.linalg.norm(ref), 1e-30)),
+        float(np.max(np.abs(diff)) / max(np.max(np.abs(ref)), 1e-30)),
+    )
 
 
 def _operator_gate(baseline, physics, options: SolverOptions):
@@ -189,12 +202,7 @@ def _operator_gate(baseline, physics, options: SolverOptions):
     loss_map = _losses_by_segment(physics.network, physics.pressure_losses)
     time_s = 0.37 * baseline.aortic_inflow.duration_s
     numpy_rhs, numpy_pc = _rhs(
-        baseline,
-        physics.network,
-        conserved,
-        capacitor,
-        time_s,
-        loss_map,
+        baseline, physics.network, conserved, capacitor, time_s, loss_map
     )
     numpy_dt, numpy_cfl_rate, numpy_diffusion_rate = _stability_dt(
         conserved, physics.network, baseline, options
@@ -213,17 +221,18 @@ def _operator_gate(baseline, physics, options: SolverOptions):
         time_s=time_s,
         options=options,
     )
+    ordered_ids = tuple(sorted(numpy_rhs, key=lambda value: int(value)))
     ref_state = np.concatenate(
-        [np.asarray(numpy_rhs[sid], dtype=float).reshape(-1) for sid in sorted(numpy_rhs)]
+        [np.asarray(numpy_rhs[sid], dtype=float).reshape(-1) for sid in ordered_ids]
     )
-    jax_state = np.concatenate(
+    got_state = np.concatenate(
         [
             np.asarray(jax_snapshot.derivatives[sid], dtype=float).reshape(-1)
-            for sid in sorted(numpy_rhs)
+            for sid in ordered_ids
         ]
     )
-    relative_l2, max_scaled = _relative_metrics(ref_state, jax_state)
-    terminal_ids = sorted(numpy_pc)
+    relative_l2, max_scaled = _relative_metrics(ref_state, got_state)
+    terminal_ids = tuple(sorted(numpy_pc, key=lambda value: int(value)))
     ref_pc = np.asarray([numpy_pc[sid] for sid in terminal_ids], dtype=float)
     got_pc = np.asarray(
         [jax_snapshot.capacitor_derivatives[sid] for sid in terminal_ids], dtype=float
@@ -238,7 +247,6 @@ def _operator_gate(baseline, physics, options: SolverOptions):
     diffusion_relative = abs(
         jax_snapshot.diffusion_rate_per_s - numpy_diffusion_rate
     ) / max(abs(numpy_diffusion_rate), 1e-30)
-
     passed = (
         relative_l2 <= OPERATOR_RELATIVE_L2_LIMIT
         and max_scaled <= OPERATOR_MAX_SCALED_LIMIT
@@ -277,11 +285,12 @@ def _validate_solution(solution):
     for segment in solution.segments:
         for values in (segment.area_m2, segment.flow_m3_per_s, segment.pressure_pa):
             if not np.all(np.isfinite(values)):
-                raise AssertionError(f"non-finite solution state in segment {segment.segment_id}")
+                raise AssertionError(
+                    f"non-finite solution state in segment {segment.segment_id}"
+                )
         if not np.all(segment.area_m2 > 0):
             raise AssertionError(f"non-positive area in segment {segment.segment_id}")
-        velocity = segment.flow_m3_per_s / segment.area_m2
-        if not np.all(np.isfinite(velocity)):
+        if not np.all(np.isfinite(segment.flow_m3_per_s / segment.area_m2)):
             raise AssertionError(f"non-finite U=Q/A in segment {segment.segment_id}")
 
 
@@ -290,13 +299,19 @@ def _field_equivalence(reference, candidate, points: int = 192):
         item.segment_id for item in candidate.segments
     ):
         raise AssertionError("NumPy/JAX segment identity/order mismatch")
-    target = np.linspace(0.0, min(reference.time_s[-1], candidate.time_s[-1]), points)
+    target = np.linspace(
+        0.0, min(reference.time_s[-1], candidate.time_s[-1]), points
+    )
     sums = {name: [0.0, 0.0] for name in ANCHOR_LIMITS}
-    for ref_segment, got_segment in zip(reference.segments, candidate.segments, strict=True):
+    for ref_segment, got_segment in zip(
+        reference.segments, candidate.segments, strict=True
+    ):
         if ref_segment.x_m.shape != got_segment.x_m.shape or not np.allclose(
             ref_segment.x_m, got_segment.x_m, rtol=0.0, atol=1e-14
         ):
-            raise AssertionError(f"NumPy/JAX mesh mismatch in segment {ref_segment.segment_id}")
+            raise AssertionError(
+                f"NumPy/JAX mesh mismatch in segment {ref_segment.segment_id}"
+            )
         for name in ANCHOR_LIMITS:
             ref_values = getattr(ref_segment, name)
             got_values = getattr(got_segment, name)
@@ -311,7 +326,9 @@ def _field_equivalence(reference, candidate, points: int = 192):
         for name, (num, den) in sums.items()
     }
     if any(errors[name] > ANCHOR_LIMITS[name] for name in errors):
-        raise AssertionError(f"full-solution NumPy/JAX anchor equivalence failed: {errors}")
+        raise AssertionError(
+            f"full-solution NumPy/JAX anchor equivalence failed: {errors}"
+        )
     return errors
 
 
@@ -320,8 +337,9 @@ def qualify(source: Path, report_path: Path, code_revision: str) -> dict[str, ob
     options = SolverOptions()
     session = vq.open_dataset("pwdb:3275625", source=source, offline=True)
     assembler = PWDBBaselineAssembler(_acquisition(source), offline=True)
-    baseline, cases, physics_cases, rejections = _select_subject(session, assembler, options)
-
+    baseline, cases, physics_cases, rejections = _select_subject(
+        session, assembler, options
+    )
     report: dict[str, object] = {
         "format": "vascuquest-jax-one-subject-qualification",
         "format_version": 1,
@@ -341,7 +359,9 @@ def qualify(source: Path, report_path: Path, code_revision: str) -> dict[str, ob
         "scientific_boundary": {
             "evidence": "MODELLED",
             "clinical_validation": False,
-            "population_interpretation": "single_subject_backend_qualification_not_epidemiological",
+            "population_interpretation": (
+                "single_subject_backend_qualification_not_epidemiological"
+            ),
         },
     }
     _write_json(report_path, report)
@@ -366,7 +386,7 @@ def qualify(source: Path, report_path: Path, code_revision: str) -> dict[str, ob
         timing = asdict(solver.last_timing) if solver.last_timing is not None else {}
         case_record = {
             "condition": name,
-            "specification": spec.to_dict(),
+            "specification": _spec_payload(spec),
             "modified_segment_ids": list(physics.modified_segment_ids),
             "operator_equivalence": operator,
             "jax_full_solve": {
@@ -400,13 +420,14 @@ def qualify(source: Path, report_path: Path, code_revision: str) -> dict[str, ob
         for item in report["cases"]
         if item["condition"] == anchor_name
     )
-    speedup = float(numpy_wall / max(float(jax_wall), 1e-12))
     report["full_numpy_jax_anchor"] = {
         "condition": anchor_name,
         "status": "PASS",
         "numpy_wall_seconds": numpy_wall,
         "jax_wall_seconds_including_compile": jax_wall,
-        "speedup_including_jax_compile": speedup,
+        "speedup_including_jax_compile": float(
+            numpy_wall / max(float(jax_wall), 1e-12)
+        ),
         "relative_l2_errors": errors,
         "numpy_diagnostics": asdict(numpy_solution.diagnostics),
         "jax_diagnostics": asdict(jax_solution.diagnostics),
@@ -416,7 +437,10 @@ def qualify(source: Path, report_path: Path, code_revision: str) -> dict[str, ob
     report["generated_utc"] = datetime.now(timezone.utc).isoformat()
     _write_json(report_path, report)
     print("\nJAX ONE-SUBJECT QUALIFICATION: PASS", flush=True)
-    print(json.dumps(report["full_numpy_jax_anchor"], indent=2, sort_keys=True), flush=True)
+    print(
+        json.dumps(report["full_numpy_jax_anchor"], indent=2, sort_keys=True),
+        flush=True,
+    )
     print(report_path, flush=True)
     return report
 
@@ -430,21 +454,23 @@ def main() -> int:
     try:
         qualify(args.source, args.report, args.code_revision)
     except Exception as exc:
-        failure = {
-            "format": "vascuquest-jax-one-subject-qualification",
-            "format_version": 1,
-            "status": "FAIL",
-            "code_revision": args.code_revision,
-            "generated_utc": datetime.now(timezone.utc).isoformat(),
-            "error_type": type(exc).__name__,
-            "error": str(exc),
-            "traceback": traceback.format_exc(),
-            "scientific_boundary": {
-                "evidence": "MODELLED",
-                "clinical_validation": False,
+        _write_json(
+            args.report,
+            {
+                "format": "vascuquest-jax-one-subject-qualification",
+                "format_version": 1,
+                "status": "FAIL",
+                "code_revision": args.code_revision,
+                "generated_utc": datetime.now(timezone.utc).isoformat(),
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+                "traceback": traceback.format_exc(),
+                "scientific_boundary": {
+                    "evidence": "MODELLED",
+                    "clinical_validation": False,
+                },
             },
-        }
-        _write_json(args.report, failure)
+        )
         raise
     return 0
 
