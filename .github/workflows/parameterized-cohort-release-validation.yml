@@ -25,6 +25,7 @@ jobs:
         run: |
           python -m py_compile tests/full_data/parameterized_cohort_release_validation.py
           python -m py_compile tests/full_data/parameterized_cohort_colab_validation.py
+          python -m py_compile tests/full_data/parameterized_cohort_colab_stage.py
 
       - name: Install qualification candidate
         run: python -m pip install .
