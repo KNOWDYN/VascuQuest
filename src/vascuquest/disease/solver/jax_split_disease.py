@@ -11,10 +11,10 @@ step:
     -> global Voigt RKC2 half step
     -> exact focal-loss half step
 
-The composition is symmetric and second order.  In the non-autonomous extended
+The composition is symmetric and second order. In the non-autonomous extended
 system, physical time advances only in the hyperbolic/network subflow; the
 source subflows therefore evaluate boundary data at the left/right endpoint of
-the outer step respectively.  Young--Seeley excess inertance must be zero,
+the outer step respectively. Young--Seeley excess inertance must be zero,
 which is the deployed Virtual Disease v1 contract.
 """
 
@@ -53,9 +53,6 @@ jax.config.update("jax_enable_x64", True)
 
 JAX_SPLIT_SCHEME_ID = "jax-exact-loss-rkc2-voigt-ssprk2-v1"
 _RKC_DAMPING = 2.0 / 13.0
-# The classical damped RKC2 real-axis stability interval is approximately
-# 0.65*s^2.  Use a deliberately conservative coefficient for stage selection.
-_RKC_STABILITY_COEFFICIENT = 0.60
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,7 +119,7 @@ def _split_kernel_factory(
     targets = jnp.asarray(target_times, dtype=jnp.float64)
     sample_count = int(target_times.size)
 
-    # Reuse the already-qualified complete semidiscrete JAX operator.  Its
+    # Reuse the already-qualified complete semidiscrete JAX operator. Its
     # cycle/history functions are intentionally ignored here.
     full_rhs, full_stability, _, _, _ = _kernel_factory(
         baseline, problem, options, max_steps_per_cycle=2
@@ -130,7 +127,6 @@ def _split_kernel_factory(
 
     loss_linear = p["loss_linear_density"]
     loss_quadratic = p["loss_quadratic_density"]
-    loss_inertance = p["loss_inertance_density"]
 
     def pressure(area, reference_area, stiffness):
         return diastolic + stiffness * (
@@ -305,11 +301,28 @@ def _split_kernel_factory(
     def rkc_stage_count(U, duration):
         area = U[0]
         diffusion_rate = 2.0 * gamma * jnp.sqrt(area) / rho / (dx * dx)
-        spectral = jnp.max(diffusion_rate)
-        raw = jnp.ceil(
-            jnp.sqrt(1.0 + duration * spectral / _RKC_STABILITY_COEFFICIENT)
-        ).astype(jnp.int32)
-        return jnp.maximum(raw, jnp.asarray(2, dtype=jnp.int32)), spectral
+        maximum_rate = jnp.max(diffusion_rate)
+        explicit_safe_dt = jnp.where(
+            maximum_rate > 0.0,
+            diffusion_safety / maximum_rate,
+            jnp.inf,
+        )
+        # The damped second-order RKC real stability boundary scales as
+        # beta(s) ~= 0.65*(s^2-1).  Relative to s=2, beta(s)/beta(2) is
+        # approximately (s^2-1)/3.  Therefore choose the smallest s whose
+        # stable interval is at least duration/explicit_safe_dt times the
+        # already-qualified explicit Voigt safety step. This preserves the
+        # user's configured diffusion_safety instead of introducing a new
+        # empirical RKC safety constant.
+        ratio = jnp.where(
+            jnp.isfinite(explicit_safe_dt),
+            duration / explicit_safe_dt,
+            0.0,
+        )
+        raw = jnp.ceil(jnp.sqrt(1.0 + 3.0 * jnp.maximum(ratio, 0.0))).astype(
+            jnp.int32
+        )
+        return jnp.maximum(raw, jnp.asarray(2, dtype=jnp.int32)), maximum_rate
 
     def rkc2_voigt(U0, pc, frozen_time, duration):
         stages, spectral = rkc_stage_count(U0, duration)
