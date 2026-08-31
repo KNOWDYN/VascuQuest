@@ -85,12 +85,16 @@ def _write_json(path: Path, payload: object) -> None:
     )
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
+def _digest(path: Path, algorithm: str) -> str:
+    digest = hashlib.new(algorithm)
     with path.open("rb") as handle:
         for block in iter(lambda: handle.read(8 * 1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def _sha256(path: Path) -> str:
+    return _digest(path, "sha256")
 
 
 def _find_unique(root: Path, filename: str) -> Path:
@@ -124,16 +128,13 @@ def stage_sources(drive_root: Path, local_source: Path, output_root: Path):
         drive_file = _find_unique(drive_root, artifact.filename)
         expected = artifact.checksum_value
         algorithm = artifact.checksum_algorithm
-        drive_hash = hashlib.new(algorithm, drive_file.read_bytes()).hexdigest()
+        drive_hash = _digest(drive_file, algorithm)
         if drive_hash != expected:
             raise RuntimeError(f"Drive checksum mismatch for {artifact.filename}")
         local_file = local_source / artifact.filename
-        if (
-            not local_file.exists()
-            or hashlib.new(algorithm, local_file.read_bytes()).hexdigest() != expected
-        ):
+        if not local_file.exists() or _digest(local_file, algorithm) != expected:
             _copy(drive_file, local_file)
-        local_hash = hashlib.new(algorithm, local_file.read_bytes()).hexdigest()
+        local_hash = _digest(local_file, algorithm)
         if local_hash != expected:
             raise RuntimeError(f"local checksum mismatch for {artifact.filename}")
         records.append(
@@ -342,38 +343,47 @@ def execute_plan(
     )
     verified: dict[str, object] = {}
     assert process.stdout is not None
-    for line in process.stdout:
-        print(line, end="", flush=True)
-        match = SUBJECT_LINE.search(line)
-        if match is None:
-            continue
-        subject_id = match.group(1).strip()
-        record = validate_subject(bundle / "subjects" / subject_id, subject_id)
-        check = vq.disease.verify_parameterized_cohort_bundle(bundle)
-        if check["valid"] is not True:
-            raise AssertionError("public cohort verifier returned valid != true")
-        if subject_id not in check["canonical_subject_ids"]:
-            raise AssertionError(
-                f"public verifier did not include completed subject {subject_id}"
+    try:
+        for line in process.stdout:
+            print(line, end="", flush=True)
+            match = SUBJECT_LINE.search(line)
+            if match is None:
+                continue
+            subject_id = match.group(1).strip()
+            record = validate_subject(bundle / "subjects" / subject_id, subject_id)
+            check = vq.disease.verify_parameterized_cohort_bundle(bundle)
+            if check["valid"] is not True:
+                raise AssertionError("public cohort verifier returned valid != true")
+            if subject_id not in check["canonical_subject_ids"]:
+                raise AssertionError(
+                    f"public verifier did not include completed subject {subject_id}"
+                )
+            verified[subject_id] = record
+            _write_json(
+                root / f"{label}_progress.json",
+                {
+                    "status": "IN_PROGRESS",
+                    "cohort_run_id": plan.run_id,
+                    "subjects_verified": [
+                        verified[sid]
+                        for sid in plan.canonical_subject_ids
+                        if sid in verified
+                    ],
+                    "updated_utc": datetime.now(timezone.utc).isoformat(),
+                },
             )
-        verified[subject_id] = record
-        _write_json(
-            root / f"{label}_progress.json",
-            {
-                "status": "IN_PROGRESS",
-                "cohort_run_id": plan.run_id,
-                "subjects_verified": [
-                    verified[sid]
-                    for sid in plan.canonical_subject_ids
-                    if sid in verified
-                ],
-                "updated_utc": datetime.now(timezone.utc).isoformat(),
-            },
-        )
-        print(
-            f"  -> immediate persisted-subject verification PASS: {subject_id}",
-            flush=True,
-        )
+            print(
+                f"  -> immediate persisted-subject verification PASS: {subject_id}",
+                flush=True,
+            )
+    except Exception:
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        raise
 
     return_code = process.wait()
     if return_code != 0:
