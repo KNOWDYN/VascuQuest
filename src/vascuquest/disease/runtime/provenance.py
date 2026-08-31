@@ -21,7 +21,9 @@ from vascuquest.provenance import (
 from vascuquest.schema import load_manifest
 
 RUNTIME_METHOD_ID = "vascuquest:virtual-disease-runtime"
-RUNTIME_COMPONENT_VERSION = "1.0.0"
+RUNTIME_COMPONENT_VERSION = "1.1.0"
+JAX_SPLIT_SCHEME_ID = "jax-exact-loss-rkc2-voigt-ssprk2-v1"
+NUMPY_REFERENCE_SCHEME_ID = "numpy-explicit-ssprk2-vd1"
 
 
 def _identity_payload(identity: DatasetIdentity) -> dict[str, str]:
@@ -61,6 +63,12 @@ def runtime_component() -> ComponentReference:
     )
 
 
+def _solver_execution(diagnostics: SolverDiagnostics) -> tuple[str, str]:
+    if diagnostics.wall_viscoelasticity_mode == "pwdb_voigt_gamma_rkc2_global_split":
+        return "jax", JAX_SPLIT_SCHEME_ID
+    return "numpy", NUMPY_REFERENCE_SCHEME_ID
+
+
 def build_runtime_provenance(
     *,
     runtime_identity: DatasetIdentity,
@@ -78,14 +86,13 @@ def build_runtime_provenance(
 ) -> ProvenanceRecord:
     """Build one MODELLED result record with explicit parent/source lineage facts.
 
-    Core provenance v1 intentionally requires direct input records to use the
-    same dataset identity. The parent PWDB identity is therefore encoded as an
-    explicit immutable parameter rather than falsifying a cross-dataset input
-    edge. Source artifact checksums still identify the canonical PWDB inputs.
+    The disease run identity describes the scientific intervention. Numerical
+    backend/scheme are recorded separately so accelerated execution never
+    changes the causal disease identity while remaining auditable.
     """
-
     if runtime_identity != subject.dataset_identity:
         raise ValueError("runtime subject identity must match runtime dataset identity")
+    solver_backend, numerical_scheme = _solver_execution(diagnostics)
     parameters = {
         "virtual_disease_contract": run_identity.contract_version,
         "run_id": run_identity.run_id,
@@ -97,6 +104,9 @@ def build_runtime_provenance(
         "quantity": quantity_name,
         "quantity_status": quantity_status.value,
         "modified_segment_ids": list(physics.modified_segment_ids),
+        "solver_backend": solver_backend,
+        "numerical_scheme_id": numerical_scheme,
+        "solver_precision": "float64",
         "solver_options": asdict(solver_options),
         "solver_diagnostics": asdict(diagnostics),
     }
@@ -126,6 +136,8 @@ def build_runtime_provenance(
 
 
 __all__ = [
+    "JAX_SPLIT_SCHEME_ID",
+    "NUMPY_REFERENCE_SCHEME_ID",
     "RUNTIME_COMPONENT_VERSION",
     "RUNTIME_METHOD_ID",
     "build_runtime_provenance",
