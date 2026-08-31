@@ -31,7 +31,7 @@ def create_disease_solver(
     resolved = normalize_solver_backend(backend)
     if resolved == "numpy":
         return DiseaseOneDSolver(options)
-    from .jax_disease import JaxDiseaseOneDSolver
+    from .jax_disease_v2 import JaxDiseaseOneDSolver
 
     return JaxDiseaseOneDSolver(options)
 
