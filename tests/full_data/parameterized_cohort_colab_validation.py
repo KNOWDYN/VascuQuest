@@ -122,16 +122,47 @@ def _copy(source: Path, destination: Path) -> None:
 def stage_sources(drive_root: Path, local_source: Path, output_root: Path):
     manifest = load_manifest()
     local_source.mkdir(parents=True, exist_ok=True)
+    record_path = output_root / "source_artifacts.json"
+    cached = {}
+    if record_path.exists():
+        try:
+            cached = {
+                str(item["artifact_id"]): item
+                for item in json.loads(record_path.read_text(encoding="utf-8"))
+            }
+        except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
+            cached = {}
+
     records = []
     for artifact_id in REQUIRED_ARTIFACT_IDS:
         artifact = manifest.artifact(artifact_id)
-        drive_file = _find_unique(drive_root, artifact.filename)
         expected = artifact.checksum_value
         algorithm = artifact.checksum_algorithm
+        local_file = local_source / artifact.filename
+        cached_item = cached.get(artifact_id)
+
+        if (
+            cached_item is not None
+            and cached_item.get("checksum") == expected
+            and local_file.exists()
+            and _digest(local_file, algorithm) == expected
+        ):
+            records.append(
+                {
+                    "artifact_id": artifact_id,
+                    "filename": artifact.filename,
+                    "bytes": local_file.stat().st_size,
+                    "checksum_algorithm": algorithm,
+                    "checksum": expected,
+                    "source_verification": "reused_verified_drive_record_and_rechecked_local",
+                }
+            )
+            continue
+
+        drive_file = _find_unique(drive_root, artifact.filename)
         drive_hash = _digest(drive_file, algorithm)
         if drive_hash != expected:
             raise RuntimeError(f"Drive checksum mismatch for {artifact.filename}")
-        local_file = local_source / artifact.filename
         if not local_file.exists() or _digest(local_file, algorithm) != expected:
             _copy(drive_file, local_file)
         local_hash = _digest(local_file, algorithm)
@@ -144,9 +175,10 @@ def stage_sources(drive_root: Path, local_source: Path, output_root: Path):
                 "bytes": local_file.stat().st_size,
                 "checksum_algorithm": algorithm,
                 "checksum": local_hash,
+                "source_verification": "drive_and_local_checksum_verified",
             }
         )
-    _write_json(output_root / "source_artifacts.json", records)
+    _write_json(record_path, records)
     return records
 
 
@@ -155,6 +187,24 @@ def _scalar(result: object) -> float:
     if values.size != 1:
         raise AssertionError("expected exactly one scalar source value")
     return float(values[0])
+
+
+def _lock_code_revision(output_root: Path, code_revision: str) -> None:
+    marker = output_root / "code_revision.json"
+    if marker.exists():
+        payload = json.loads(marker.read_text(encoding="utf-8"))
+        if payload.get("code_revision") != code_revision:
+            raise RuntimeError(
+                "qualification output root belongs to a different code revision"
+            )
+        return
+    _write_json(
+        marker,
+        {
+            "code_revision": code_revision,
+            "created_utc": datetime.now(timezone.utc).isoformat(),
+        },
+    )
 
 
 def create_plan(
@@ -508,6 +558,8 @@ def run_phase(
     output_root: Path,
     code_revision: str,
 ):
+    _lock_code_revision(output_root, code_revision)
+
     if phase == "smoke":
         patients = 1
         phase_name = "smoke_1_subject"
@@ -591,6 +643,7 @@ def run_phase(
 
 
 def finalize(output_root: Path, code_revision: str) -> None:
+    _lock_code_revision(output_root, code_revision)
     smoke = json.loads(
         (output_root / "smoke_results.json").read_text(encoding="utf-8")
     )
