@@ -4,6 +4,7 @@ from . import plugins as plugins
 from ._version import __version__
 from .api import DatasetSession
 from .bootstrap import open_dataset, register_source
+from . import disease as disease
 from .domain import (
     Cohort,
     DatasetIdentity,
@@ -64,6 +65,7 @@ __all__ = [
     "VirtualSubject",
     "Waveform",
     "__version__",
+    "disease",
     "open_dataset",
     "plugins",
     "register_source",
