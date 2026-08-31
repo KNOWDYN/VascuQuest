@@ -1,10 +1,10 @@
-# JAX-accelerated Virtual Disease qualification gate
+# JAX Virtual Disease backend qualification gate
 
 ## Purpose
 
-PR #19 introduced the Parameterized Virtual Disease Cohort Engine. PR #20 now adds an optional JAX/XLA execution backend for the same frozen Virtual Disease numerical model and defines the real-source qualification gate that must pass before that backend is merged and shipped.
+PR #20 adds an optional JAX-accelerated execution backend for the frozen Virtual Disease 1-D haemodynamic equations. The NumPy `DiseaseOneDSolver` remains unchanged and remains the default/reference implementation.
 
-The existing NumPy `DiseaseOneDSolver` remains the default and reference implementation. PR #20 does not change the Virtual Disease presets, causal disease transformations, PWDB interpretation, or scientific boundary.
+The gate does **not** establish clinical validation. It qualifies software/mechanistic equivalence and accelerated execution against canonical PWDB 3275625 while retaining:
 
 ```text
 EvidenceClass = MODELLED
@@ -13,135 +13,80 @@ clinical validation = false
 population interpretation = backend qualification, not epidemiological
 ```
 
-## Backend contract
+## Canonical source
 
-The JAX backend must preserve the frozen NumPy mechanics:
-
-- canonical 116-segment arterial network;
-- PWDB beta wall law and characteristic wave speed;
-- second-order MUSCL reconstruction;
-- HLL-type interface flux in perturbation variables;
-- explicit PWDB Voigt-wall momentum source;
-- characteristic internal-junction coupling;
-- prescribed periodic aortic-root flow boundary;
-- terminal three-element Windkessel/RCR coupling;
-- focal stenosis pressure-loss terms when present;
-- adaptive SSP-RK2 time stepping;
-- configured CFL, diffusion, area-floor and periodicity controls;
-- the same `ForwardSolution`, `SegmentSolution`, and `SolverDiagnostics` public value objects.
-
-JAX is an optional dependency. Core VascuQuest installs continue to work without it. X64 is enabled for qualification against the NumPy reference.
-
-## Real-source scope
-
-Qualification uses the exact canonical PWDB artifacts required by Virtual Disease:
+Qualification uses the exact Virtual Disease PWDB artifacts:
 
 - `pwdb_model_configs.csv`;
 - `geo.zip`;
 - `PWs_csv.zip`.
 
-The Colab route copies exact existing Drive files once to local SSD and verifies their canonical manifest checksums. Missing files are acquired through VascuQuest's canonical artifact layer. It does not recursively scan mounted Google Drive.
+The Colab staging helper checks only the configured `PWDB_3275625` directory, copies existing exact files once to local SSD, verifies them locally, and acquires only missing/invalid canonical artifacts through VascuQuest's checksum-verified acquisition layer.
 
-## One-subject qualification design
+## Why the repaired JAX backend is required
 
-The preferred gate uses **one deterministic canonical PWDB subject** for all four frozen Virtual Disease conditions:
+The first JAX prototype coupled an artificial `500_000`-step cardiac-cycle guard to an all-step final-cycle history buffer. Real focal-stenosis pressure-loss stability can legitimately require more than 500,000 explicit SSP-RK2 steps per cycle under the frozen NumPy stability rule. Increasing that fixed limit would also have increased replay-history memory without bound.
+
+The production JAX backend therefore keeps the same numerical operator and adaptive SSP-RK2 path but changes execution control only:
+
+- a subject/network-specific safety cap is derived from the initial stability `dt`, with a generous nonlinear guard;
+- the safety cap is only a scalar loop guard and does not size the output history;
+- the final converged cardiac cycle is replayed onto the source aortic-inflow time grid with linear interpolation between the exact adaptive-step states;
+- only that bounded sampled history is retained for the 116-segment `ForwardSolution`;
+- the adaptive integration path itself is not shortened, coarsened, or replaced by a different disease equation.
+
+The package backend selector routes explicit `backend="jax"` requests to this bounded-replay implementation. NumPy remains the unchanged default.
+
+## One-subject real-PWDB qualification
+
+Preferred notebook:
+
+```text
+notebooks/jax_one_subject_qualification_v2_colab.ipynb
+```
+
+Runner:
+
+```text
+tests/full_data/jax_one_subject_qualification_v2.py
+```
+
+The same deterministic canonical PWDB subject is used across all four frozen disease conditions:
 
 1. carotid stenosis;
 2. iliac stenosis;
 3. fusiform abdominal aortic aneurysm;
 4. large-artery stiffening.
 
-The subject is selected deterministically from source ages 45 or 55 and must be individually admissible for all four interventions. The same subject identity is retained throughout the gate.
+For every transformed network, qualification requires NumPy↔JAX equivalence of the RHS, terminal-capacitor derivative and stability operators on the same deterministic non-trivial state. All four conditions must then complete a full periodic JAX solve with exactly 116 segments, finite `A`, `Q`, `P`, finite derived `U=Q/A`, positive area and `converged = true`.
 
-### Q1 — NumPy↔JAX numerical-operator equivalence
+One large-artery-stiffening case additionally runs the frozen NumPy solver end-to-end and compares full-network final-cycle fields after time interpolation. This anchor separates correctness qualification from performance measurement while avoiding four additional slow NumPy solves.
 
-For every transformed disease network, construct the same deterministic non-trivial `A,Q` state and terminal capacitor pressures. Evaluate both backends without advancing time and compare:
+The report records, per JAX case:
 
-- full 116-segment finite-volume RHS;
-- terminal capacitor-pressure derivatives;
-- adaptive stability time step;
-- maximum hyperbolic/CFL rate;
-- maximum explicit Voigt diffusion rate;
-- disease pressure-loss stability bound where applicable.
+- operator-equivalence metrics;
+- convergence diagnostics;
+- total wall time;
+- final-cycle adaptive step count;
+- derived per-cycle safety cap;
+- initial stability time step;
+- bounded output sample count;
+- JAX device/platform and X64 status.
 
-Qualification tolerances are intentionally tight because this gate compares the same discrete operator in float64 rather than independent clinical models.
+## Durable evidence
 
-### Q2 — complete JAX execution for all four diseases
-
-For all four conditions, require the JAX solver to:
-
-- complete the full 116-segment network;
-- reach the existing periodic-convergence criterion;
-- return a finite, strictly increasing final-cycle time coordinate;
-- return finite `A(t,x)`, `Q(t,x)` and `P(t,x)` on every segment;
-- retain positive lumen area everywhere;
-- produce finite derived cross-sectional mean velocity `U=Q/A`;
-- report the existing numerical diagnostics.
-
-### Q3 — end-to-end NumPy↔JAX anchor
-
-One large-artery-stiffening case is additionally executed to convergence by the frozen NumPy solver. Large-artery stiffening is used as the full-solve anchor because it retains the ordinary source mesh while changing the large-conduit beta coefficients, avoiding the extra lesion-specific mesh refinement cost of stenosis and AAA.
-
-The full final cycle is compared across all 116 segments after interpolation to a common temporal grid. Qualification requires bounded relative L2 differences in:
-
-- lumen area;
-- volumetric flow;
-- pressure.
-
-The NumPy and JAX solver diagnostics are retained in the machine-readable report.
-
-### Q4 — benchmark evidence
-
-Timing is evidence, not a correctness criterion. Record separately:
-
-- JAX first-cycle compile-plus-execute time;
-- subsequent compiled-cycle execution time;
-- final-cycle replay/history construction time;
-- full JAX wall time for each disease;
-- full NumPy anchor wall time;
-- NumPy/JAX anchor speed ratio;
-- actual JAX platform/device and X64 state.
-
-This prevents JIT compilation cost from being confused with steady compiled execution performance.
-
-## Preferred execution route
-
-Open:
+The preferred Colab notebook writes:
 
 ```text
-notebooks/jax_one_subject_qualification_colab.ipynb
+MyDrive/VascuQuest/jax_one_subject_qualification_v2/<code-revision-prefix>/jax-one-subject-qualification.json
 ```
 
-The notebook:
+The v2 failure wrapper preserves any already-completed case records and appends the exception instead of erasing partial evidence.
 
-- mounts Google Drive;
-- clones the exact PR #20 branch and records the commit SHA;
-- installs VascuQuest with the optional `[jax]` extra;
-- reports the active JAX device;
-- stages/verifies canonical PWDB artifacts to local SSD;
-- runs `tests/full_data/jax_one_subject_qualification.py`;
-- persists failure evidence if any gate fails;
-- writes the durable PASS/FAIL report to:
+## GitHub Actions
 
-```text
-MyDrive/VascuQuest/jax_one_subject_qualification/<code-revision-prefix>/jax-one-subject-qualification.json
-```
+`.github/workflows/parameterized-cohort-release-validation.yml` is deliberately `workflow_dispatch`-only. It compiles both JAX modules and executes the v2 qualification runner on CPU as an optional reproducibility route. The Colab GPU notebook is the preferred acceleration/performance route.
 
-## GitHub Actions route
+Ordinary Core CI and the independent PWDB Core Tier-4 real-source regression remain separate gates.
 
-`.github/workflows/parameterized-cohort-release-validation.yml` remains `workflow_dispatch`-only. It exists as a reproducible manual CI route; the Colab notebook is preferred when GPU hardware is required or interactive diagnostics are useful.
-
-Ordinary Core CI and the existing PWDB Core Tier-4 real-source regression remain independent gates and must continue to pass.
-
-## Merge rule
-
-PR #20 must remain unmerged until:
-
-1. ordinary Core CI passes;
-2. existing PWDB Core Tier-4 regression passes;
-3. `jax-one-subject-qualification.json` reports `PASS` for the exact PR head being merged;
-4. all four operator-equivalence gates pass;
-5. all four JAX disease solves converge with complete finite 116-segment output;
-6. the full NumPy↔JAX anchor passes its field-equivalence tolerances.
-
-A passing report qualifies the JAX backend as a software/mechanistic execution backend for the current Virtual Disease model. It does **not** establish epidemiological representativeness, clinical outcome validity, diagnostic performance, patient-specific prediction, or equivalence to clinical tonometry/Doppler measurements.
+Do not merge PR #20 until the durable v2 report is `PASS` and its operator, convergence, step-count and NumPy/JAX anchor evidence have been inspected. A PASS qualifies the accelerated backend within the current Virtual Disease model context; it does not establish epidemiological representativeness, clinical outcome validity, diagnostic accuracy or patient-specific prediction.
