@@ -26,6 +26,7 @@ from vascuquest.errors import (
 
 from .commands import register_commands
 from .disease_commands import disease_app
+from .disease_cohort_commands import cohort_app
 
 
 app = typer.Typer(
@@ -65,6 +66,7 @@ def _root(
 
 
 register_commands(app)
+disease_app.add_typer(cohort_app, name="cohort")
 app.add_typer(disease_app, name="disease")
 
 
