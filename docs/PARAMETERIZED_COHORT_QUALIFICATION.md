@@ -15,81 +15,87 @@ population interpretation = designed_counterfactual_not_epidemiological
 
 ## Real-source scope
 
-The qualification workflow acquires and checksum-verifies the exact PWDB artifacts required by Virtual Disease:
+The qualification uses the exact PWDB artifacts required by Virtual Disease:
 
 - `pwdb_model_configs.csv`;
 - `geo.zip`;
 - `PWs_csv.zip`.
 
-It then performs the following gates against the public merged VascuQuest API.
+It applies the following gates against the public VascuQuest cohort surface.
 
 ### Q1 — source age and subject identity
 
-- Confirm the canonical source age states are exactly `25, 35, 45, 55, 65, 75` years.
-- Request the qualification interval 45–75 years and require the resolved source-supported ages to be exactly `45, 55, 65, 75`.
+- Confirm the source-supported PWDB age states used by the request are `45, 55, 65, 75` years for the 45–75 qualification interval.
 - Verify each planned assignment retains the original PWDB canonical subject number.
-- Verify the age recorded in each assignment equals the source PWDB age for that subject.
+- Verify the age recorded in each assignment equals the canonical source age for that subject.
 
 ### Q2 — deterministic parameterized planning
 
-For each of the four Virtual Disease v1 conditions, create the same plan twice and require exact equality of:
+For every Virtual Disease v1 condition, create each qualification plan twice and require exact equality of run identity, subject selection, severity assignments, per-subject disease specifications, rejections and planner metadata.
 
-- content-addressed cohort run ID;
-- selected canonical subject IDs;
-- assigned disease severities;
-- complete per-subject disease specifications;
-- recorded rejections and planner metadata.
+### Q3 — progressive real disease execution
 
-The planner must create heterogeneous severities inside the requested interval and continue to use the deployed disease transformation as the subject-specific admissibility authority.
+The preferred manual route is `notebooks/parameterized_cohort_qualification_colab.ipynb`.
 
-### Q3 — real disease execution
+It executes:
 
-Generate three real-source subjects for each condition:
+1. a smoke gate of **1 subject × 4 disease conditions**;
+2. only after all four smoke cases pass, a full gate of **3 subjects × 4 disease conditions**.
 
-1. carotid stenosis;
-2. iliac stenosis;
-3. fusiform abdominal aortic aneurysm;
-4. large-artery stiffening.
+The canonical conditions are carotid stenosis, iliac stenosis, fusiform abdominal aortic aneurysm and large-artery stiffening.
 
-Every subject must execute through the existing Virtual Disease full-network solver and reach periodic convergence.
+Every completed subject is persisted to Google Drive and verified immediately before the next subject is accepted.
 
 ### Q4 — full 116-segment persistence
 
-For every completed subject, require:
-
-- exactly 116 unique segment IDs;
-- finite, strictly increasing final-cycle time coordinate;
-- finite axial coordinates;
-- finite `A(t,x)`, `Q(t,x)` and `P(t,x)` histories;
-- strictly positive lumen area everywhere;
-- finite derived cross-sectional mean velocity `U=Q/A`;
-- exactly 58 standard materialised Virtual Disease results.
+For every completed subject require exactly 116 unique segments, a finite increasing final-cycle time coordinate, finite axial coordinates, finite `A(t,x)`, `Q(t,x)` and `P(t,x)`, positive lumen area, finite `U=Q/A`, and exactly 58 standard materialised Virtual Disease results.
 
 ### Q5 — bundle integrity and scientific boundary
 
-Require the public cohort verifier to report:
-
-- `valid = true`;
-- `status = COMPLETE`;
-- all planned original subject IDs verified in frozen order;
-- full-network segment count = 116;
-- evidence = `MODELLED`;
-- clinical validation = false.
-
-The persistent manifest must continue to state `designed_counterfactual_not_epidemiological`.
+Require `valid = true`, a complete frozen subject identity/order at phase completion, full-network segment count 116, `MODELLED` evidence, `clinical_validation = false`, and `designed_counterfactual_not_epidemiological` population interpretation.
 
 ### Q6 — completed-checkpoint resume
 
-Re-run every completed cohort with `resume=True` and verify SHA-256 equality of each subject's `subject_manifest.json` and `full_network.npz` before and after resume. A completed subject must therefore be verified and skipped rather than recomputed.
+Re-run each completed cohort with native `resume` and require SHA-256 equality of each subject's `subject_manifest.json` and `full_network.npz` before and after resume.
 
-## Machine-readable evidence
+## Execution routes
 
-The workflow uploads:
+### Preferred: Google Colab manual qualification
+
+Open:
 
 ```text
-parameterized-cohort-qualification.json
+notebooks/parameterized_cohort_qualification_colab.ipynb
 ```
 
-as the `vascuquest-parameterized-cohort-qualification` GitHub Actions artifact for 90 days.
+The notebook:
 
-A passing report qualifies the Parameterized Cohort Engine for reproducible research cohort generation within the existing Virtual Disease model context. It does not convert a modelled cohort into clinical patient data and does not establish epidemiological representativeness or clinical outcome validity.
+- clones the PR #20 qualification branch and records the exact commit;
+- mounts Google Drive;
+- checksum-verifies canonical PWDB artifacts and stages them to Colab local SSD;
+- persists subject bundles and progress JSON to Drive;
+- verifies each subject immediately on completion;
+- blocks the 3-subject phase until all four 1-subject smoke cases pass;
+- writes the final durable report to:
+
+```text
+MyDrive/VascuQuest/parameterized_cohort_qualification/parameterized-cohort-qualification.json
+```
+
+### Optional: GitHub Actions full gate
+
+`.github/workflows/parameterized-cohort-release-validation.yml` is deliberately `workflow_dispatch`-only because the full 12-subject numerical qualification is too expensive and opaque for an automatic pull-request gate.
+
+The original reusable Python full-data harness remains at:
+
+```text
+tests/full_data/parameterized_cohort_release_validation.py
+```
+
+The checkpointed Colab/manual runner is:
+
+```text
+tests/full_data/parameterized_cohort_colab_validation.py
+```
+
+A passing report qualifies the Parameterized Cohort Engine for reproducible research cohort generation within the current Virtual Disease model context. It does not establish epidemiological representativeness, clinical outcome validity or patient-specific clinical prediction.

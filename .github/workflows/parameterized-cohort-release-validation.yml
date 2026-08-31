@@ -1,8 +1,6 @@
 name: Parameterized cohort real-source qualification
 
 on:
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -10,7 +8,6 @@ permissions:
 
 jobs:
   real-pwdb-cohort:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release/parameterized-cohort-qualification')
     name: PWDB Virtual Disease cohort qualification / Python 3.12
     runs-on: ubuntu-24.04
     timeout-minutes: 180
@@ -24,8 +21,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile qualification harness
-        run: python -m py_compile tests/full_data/parameterized_cohort_release_validation.py
+      - name: Compile qualification harnesses
+        run: |
+          python -m py_compile tests/full_data/parameterized_cohort_release_validation.py
+          python -m py_compile tests/full_data/parameterized_cohort_colab_validation.py
 
       - name: Install qualification candidate
         run: python -m pip install .
