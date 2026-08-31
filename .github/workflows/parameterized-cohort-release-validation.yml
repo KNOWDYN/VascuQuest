@@ -24,23 +24,26 @@ jobs:
       - name: Compile JAX backend and qualification harness
         run: |
           python -m py_compile src/vascuquest/disease/solver/jax_disease.py
+          python -m py_compile src/vascuquest/disease/solver/jax_disease_v2.py
           python -m py_compile src/vascuquest/disease/solver/backends.py
           python -m py_compile tests/full_data/parameterized_cohort_colab_stage.py
           python -m py_compile tests/full_data/jax_one_subject_qualification.py
+          python -m py_compile tests/full_data/jax_one_subject_qualification_v2.py
 
       - name: Install qualification candidate with JAX
         run: python -m pip install '.[jax]'
 
-      - name: Confirm frozen NumPy default and optional JAX backend
+      - name: Confirm frozen NumPy default and repaired optional JAX backend
         run: |
           python - <<'PY'
           import jax
           from vascuquest.disease.solver import create_disease_solver
           from vascuquest.disease.solver.disease_finite_volume import DiseaseOneDSolver
+          from vascuquest.disease.solver.jax_disease_v2 import JaxDiseaseOneDSolver
           numpy_solver = create_disease_solver()
           jax_solver = create_disease_solver(backend='jax')
           assert isinstance(numpy_solver, DiseaseOneDSolver)
-          assert jax_solver.__class__.__name__ == 'JaxDiseaseOneDSolver'
+          assert isinstance(jax_solver, JaxDiseaseOneDSolver)
           print('JAX version:', jax.__version__)
           print('JAX devices:', jax.devices())
           PY
@@ -56,13 +59,13 @@ jobs:
             --local-source "$RUNNER_TEMP/pwdb-source" \
             --report source-stage.json
 
-      - name: Run one-subject four-disease JAX qualification
+      - name: Run repaired one-subject four-disease JAX qualification
         shell: bash
         run: |
           export XDG_DATA_HOME="$RUNNER_TEMP/vascuquest-xdg/data"
           export XDG_CACHE_HOME="$RUNNER_TEMP/vascuquest-xdg/cache"
           export XDG_STATE_HOME="$RUNNER_TEMP/vascuquest-xdg/state"
-          python tests/full_data/jax_one_subject_qualification.py \
+          python tests/full_data/jax_one_subject_qualification_v2.py \
             --source "$RUNNER_TEMP/pwdb-source" \
             --report jax-one-subject-qualification.json \
             --code-revision "${{ github.sha }}"
