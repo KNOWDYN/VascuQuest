@@ -40,6 +40,7 @@ def test_frozen_command_tree_and_global_version() -> None:
         "plugins",
         "export",
         "reproduce",
+        "disease",
     ):
         assert name in result.output
 
@@ -52,6 +53,11 @@ def test_frozen_command_tree_and_global_version() -> None:
     assert plugins.exit_code == 0
     assert "list" in plugins.output
     assert "describe" in plugins.output
+
+    disease = runner.invoke(app, ["disease", "--help"])
+    assert disease.exit_code == 0
+    for name in ("presets", "describe", "generate"):
+        assert name in disease.output
 
     version = runner.invoke(app, ["--version"])
     assert version.exit_code == 0
@@ -83,6 +89,19 @@ def test_metadata_machine_output_is_clean_and_parseable() -> None:
     assert "vascuquest:json" in ids
     assert "vascuquest:csv" in ids
 
+    disease = runner.invoke(app, ["disease", "presets", "--format", "json"])
+    assert disease.exit_code == 0
+    assert disease.stderr == ""
+    disease_rows = json.loads(disease.stdout)
+    assert [row["condition"] for row in disease_rows] == [
+        "carotid_stenosis",
+        "iliac_stenosis",
+        "fusiform_abdominal_aortic_aneurysm",
+        "large_artery_stiffening",
+    ]
+    assert all(row["evidence"] == "MODELLED" for row in disease_rows)
+    assert all(row["clinical_validation"] is False for row in disease_rows)
+
 
 def test_plugin_describe_exposes_declared_scientific_contract() -> None:
     result = runner.invoke(
@@ -112,6 +131,26 @@ def test_plugin_describe_exposes_declared_scientific_contract() -> None:
     assert payload["citations"]
 
 
+def test_disease_describe_exposes_executable_mechanistic_boundary() -> None:
+    result = runner.invoke(
+        app,
+        ["disease", "describe", "carotid_stenosis", "--format", "json"],
+    )
+    assert result.exit_code == 0, result.output
+    assert result.stderr == ""
+    payload = json.loads(result.stdout)
+    assert payload["condition"] == "carotid_stenosis"
+    assert payload["evidence"] == "MODELLED"
+    assert payload["clinical_validation"] is False
+    assert "not clinically validated" in payload["validated_domain"]
+    assert {item["name"] for item in payload["parameters"]} >= {
+        "side",
+        "artery",
+        "nascet_stenosis",
+        "lesion_length_m",
+    }
+
+
 def test_usage_and_assignment_syntax_fail_with_code_two() -> None:
     missing = runner.invoke(app, ["get"])
     assert missing.exit_code == 2
@@ -138,6 +177,35 @@ def test_usage_and_assignment_syntax_fail_with_code_two() -> None:
         ],
     )
     assert duplicate_parameter.exit_code == 2
+
+    disease_missing_parameter = runner.invoke(
+        app,
+        [
+            "disease",
+            "generate",
+            "carotid_stenosis",
+            "--patients",
+            "1",
+            "--age",
+            "50",
+            "--offline",
+        ],
+    )
+    assert disease_missing_parameter.exit_code == 2
+
+    disease_unknown = runner.invoke(
+        app,
+        [
+            "disease",
+            "generate",
+            "unknown_disease",
+            "--patients",
+            "1",
+            "--age",
+            "50",
+        ],
+    )
+    assert disease_unknown.exit_code == 2
 
 
 def test_stable_public_exception_exit_mapping() -> None:

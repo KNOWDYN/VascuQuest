@@ -2,6 +2,19 @@
 
 All notable release-facing changes to VascuQuest are recorded here.
 
+## Unreleased
+
+### Virtual Disease v1
+
+- Added the complete first-party Virtual Disease implementation chain: immutable disease requests, deterministic age-matched PWDB subject selection, healthy baseline reconstruction, causal disease physics, disease-aware full-network solving, and content-addressed in-memory `PWDB-VD` runtime populations.
+- Added four frozen mechanistic disease presets: carotid stenosis, iliac stenosis, fusiform abdominal aortic aneurysm, and large-artery stiffening.
+- Added runtime `P`, `U`, `A`, and `Q` materialisation at all 13 canonical common sites while preserving each selected PWDB canonical subject number under a separate disease dataset identity.
+- Added explicit `DiseaseQuantityStatus` handling so unsupported disease-state quantities cannot silently inherit healthy source values.
+- Added the public Python namespace `vascuquest.disease`, including `generate_population(...)` and explicit portable runtime-bundle export.
+- Added the `vascuquest disease presets`, `disease describe`, and `disease generate` command group.
+- Added explicit portable disease bundles containing result JSON documents, full provenance records, content checksums, request identity, quantity statuses, subject IDs, scientific warnings, and the current reconstruction qualification state.
+- Virtual Disease outputs remain `MODELLED`; the healthy reconstruction gate remains `METRICS_ONLY_THRESHOLDS_NOT_FROZEN`. No clinical-validation claim is made.
+
 ## 0.1.0 — 2026-08-26
 
 First public research-software release candidate for the validated PWDB core scope.

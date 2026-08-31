@@ -25,6 +25,7 @@ from vascuquest.errors import (
 )
 
 from .commands import register_commands
+from .disease_commands import disease_app
 
 
 app = typer.Typer(
@@ -64,6 +65,7 @@ def _root(
 
 
 register_commands(app)
+app.add_typer(disease_app, name="disease")
 
 
 def _exit_code(exc: VascuQuestError) -> int:

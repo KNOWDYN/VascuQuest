@@ -1,8 +1,8 @@
-"""Frozen Virtual Disease v1 preset catalogue.
+"""Frozen executable Virtual Disease v1 preset catalogue.
 
-The catalogue is intentionally non-executable in PR 1. Scientific equations,
-validated numerical ranges, and benchmark qualification are introduced only in
-the later disease-physics implementation stage.
+The catalogue owns user-facing request semantics. Causal equations and
+subject-specific scientific admissibility remain implemented in the disease
+physics layer; catalogue bounds alone are not clinical validation.
 """
 
 from __future__ import annotations
@@ -19,11 +19,8 @@ from .presets.base import (
 )
 
 
-_CONTRACT_ONLY_DOMAIN = (
-    "Contract frozen; haemodynamic execution and scientific qualification are not "
-    "implemented in Virtual Disease PR 1."
-)
 _PWDB_CITATION = "doi:10.1152/ajpheart.00218.2019"
+_STENOSIS_LOSS_CITATION = "doi:10.1016/0021-9290(76)90086-5"
 
 
 CAROTID_STENOSIS = DiseasePresetDescriptor(
@@ -40,7 +37,7 @@ CAROTID_STENOSIS = DiseasePresetDescriptor(
         DiseaseParameterSpec(
             "artery",
             DiseaseParameterKind.TEXT,
-            "Carotid artery class targeted by the future disease transformation.",
+            "Carotid artery class targeted by the executable disease transformation.",
             allowed_values=("common_carotid", "internal_carotid"),
         ),
         DiseaseParameterSpec(
@@ -71,11 +68,17 @@ CAROTID_STENOSIS = DiseasePresetDescriptor(
         ),
     ),
     assumptions=(
-        "This descriptor defines request semantics only; it does not create a stenotic geometry.",
-        "Scientific admissibility and validated severity limits are deferred to the disease-physics stage.",
+        "The lesion is an idealised smooth raised-cosine diameter reduction on the selected source PWDB carotid segment.",
+        "The lesion must fit completely inside the selected source segment and executable stenosis must remain below complete geometric occlusion.",
+        "A Young/Seeley-based excess pressure-loss term represents focal separation loss without double-counting native 1-D inertia and baseline viscous loss.",
+        "The model is mechanistic and MODELLED; it is not a clinical stenosis reconstruction or diagnostic claim.",
     ),
-    validated_domain=_CONTRACT_ONLY_DOMAIN,
-    citations=(_PWDB_CITATION,),
+    validated_domain=(
+        "Executable v1 mechanistic domain: left/right common or internal carotid source segments; "
+        "0 <= diameter stenosis < 1 after disease-physics admissibility; lesion fully contained in the target segment. "
+        "Software/mechanistic verification only; not clinically validated."
+    ),
+    citations=(_PWDB_CITATION, _STENOSIS_LOSS_CITATION),
 )
 
 
@@ -93,7 +96,7 @@ ILIAC_STENOSIS = DiseasePresetDescriptor(
         DiseaseParameterSpec(
             "artery",
             DiseaseParameterKind.TEXT,
-            "Iliac artery class targeted by the future disease transformation.",
+            "Iliac artery class targeted by the executable disease transformation.",
             allowed_values=("common_iliac", "external_iliac"),
         ),
         DiseaseParameterSpec(
@@ -124,23 +127,29 @@ ILIAC_STENOSIS = DiseasePresetDescriptor(
         ),
     ),
     assumptions=(
-        "This descriptor defines request semantics only; it does not create a stenotic geometry.",
-        "Scientific admissibility and validated severity limits are deferred to the disease-physics stage.",
+        "The lesion is an idealised smooth raised-cosine diameter reduction on the selected source PWDB iliac segment.",
+        "The lesion must fit completely inside the selected source segment and executable stenosis must remain below complete geometric occlusion.",
+        "A Young/Seeley-based excess pressure-loss term represents focal separation loss without double-counting native 1-D inertia and baseline viscous loss.",
+        "The model is mechanistic and MODELLED; it is not a clinical stenosis reconstruction or diagnostic claim.",
     ),
-    validated_domain=_CONTRACT_ONLY_DOMAIN,
-    citations=(_PWDB_CITATION,),
+    validated_domain=(
+        "Executable v1 mechanistic domain: left/right common or external iliac source segments; "
+        "0 <= diameter stenosis < 1 after disease-physics admissibility; lesion fully contained in the target segment. "
+        "Software/mechanistic verification only; not clinically validated."
+    ),
+    citations=(_PWDB_CITATION, _STENOSIS_LOSS_CITATION),
 )
 
 
 FUSIFORM_ABDOMINAL_AORTIC_ANEURYSM = DiseasePresetDescriptor(
     condition=DiseaseCondition.FUSIFORM_ABDOMINAL_AORTIC_ANEURYSM,
     name="Fusiform abdominal aortic aneurysm",
-    summary="Idealised fusiform dilatation of the abdominal aorta.",
+    summary="Idealised smooth fusiform dilatation over the main abdominal-aortic PWDB path.",
     parameter_specs=(
         DiseaseParameterSpec(
             "maximum_diameter_m",
             DiseaseParameterKind.NUMBER,
-            "Requested maximum aneurysm diameter.",
+            "Requested absolute maximum model-space aneurysm lumen diameter.",
             minimum=1e-6,
             unit="m",
         ),
@@ -154,7 +163,7 @@ FUSIFORM_ABDOMINAL_AORTIC_ANEURYSM = DiseasePresetDescriptor(
         DiseaseParameterSpec(
             "aneurysm_center_fraction",
             DiseaseParameterKind.NUMBER,
-            "Normalized aneurysm-centre position along the eligible abdominal-aortic region.",
+            "Normalized aneurysm-centre position along the eligible abdominal-aortic path.",
             required=False,
             minimum=0.0,
             maximum=1.0,
@@ -164,10 +173,15 @@ FUSIFORM_ABDOMINAL_AORTIC_ANEURYSM = DiseasePresetDescriptor(
         ),
     ),
     assumptions=(
-        "This descriptor defines request semantics only; it does not dilate the aorta.",
-        "Wall-property changes and scientific admissibility are deferred to the disease-physics stage.",
+        "The aneurysm is a smooth idealised fusiform dilation restricted to the frozen main abdominal-aortic PWDB path.",
+        "The requested maximum diameter must exceed the healthy diameter throughout the covered aneurysm region and the lesion must fit within the eligible path.",
+        "Reference area and local wall coefficients are recalculated from the transformed radius using the same constitutive relations as the disease solver.",
+        "The model does not represent three-dimensional vortices, recirculation, thrombus, asymmetric sac geometry, rupture mechanics or remodelling.",
     ),
-    validated_domain=_CONTRACT_ONLY_DOMAIN,
+    validated_domain=(
+        "Executable v1 mechanistic domain: smooth fusiform dilation confined to PWDB abdominal-aortic segments 28, 35, 37, 39 and 41; "
+        "subject-specific geometry admissibility is enforced at runtime. Software/mechanistic verification only; not clinically validated."
+    ),
     citations=(_PWDB_CITATION,),
 )
 
@@ -175,21 +189,26 @@ FUSIFORM_ABDOMINAL_AORTIC_ANEURYSM = DiseasePresetDescriptor(
 LARGE_ARTERY_STIFFENING = DiseasePresetDescriptor(
     condition=DiseaseCondition.LARGE_ARTERY_STIFFENING,
     name="Large-artery stiffening",
-    summary="Haemodynamic phenotype represented by a future increase in large-artery wall stiffness.",
+    summary="Model-space large-conduit stiffening to a requested carotid-femoral characteristic PWV target.",
     parameter_specs=(
         DiseaseParameterSpec(
             "target_cfpwv_m_per_s",
             DiseaseParameterKind.NUMBER,
-            "Requested target carotid-femoral pulse-wave velocity.",
+            "Requested model-space carotid-femoral characteristic pulse-wave-velocity target.",
             minimum=1e-6,
             unit="m/s",
         ),
     ),
     assumptions=(
-        "This descriptor defines request semantics only; it does not alter arterial wall mechanics.",
-        "The conduit-artery scope and qualified PWV domain are deferred to the disease-physics stage.",
+        "The target is a model-space characteristic travel-time PWV, not a simulated clinical tonometry measurement.",
+        "Wall beta is uniformly scaled across the frozen bilateral large-conduit set while reference geometry, source wall viscosity, inflow and terminal beds remain unchanged.",
+        "Targets below the selected subject's baseline model-space cfPWV are rejected because this preset represents stiffening rather than softening.",
+        "The model is mechanistic and MODELLED; it is not a clinical arterial-stiffness diagnosis.",
     ),
-    validated_domain=_CONTRACT_ONLY_DOMAIN,
+    validated_domain=(
+        "Executable v1 mechanistic domain: target model-space cfPWV at or above each selected subject's baseline model-space cfPWV over the frozen large-conduit set. "
+        "Software/mechanistic verification only; not clinically validated."
+    ),
     citations=(_PWDB_CITATION,),
 )
 

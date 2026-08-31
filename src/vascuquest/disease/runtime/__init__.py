@@ -1,5 +1,6 @@
 """Runtime Virtual Disease population generation and in-memory datasets."""
 
+from .bundle import write_runtime_bundle
 from .dataset import RuntimeDiseaseDataset
 from .generator import VirtualDiseasePopulationGenerator
 from .geometry import RuntimeGeometrySegment
@@ -34,4 +35,5 @@ __all__ = [
     "runtime_dataset_identity",
     "runtime_quantity_statuses",
     "status_mapping",
+    "write_runtime_bundle",
 ]
