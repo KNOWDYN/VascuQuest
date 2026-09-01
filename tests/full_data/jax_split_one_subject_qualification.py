@@ -14,6 +14,7 @@ import argparse
 from dataclasses import asdict
 from datetime import datetime, timezone
 import json
+import math
 from pathlib import Path
 import time
 import traceback
@@ -32,10 +33,33 @@ FORMAT = "vascuquest-jax-split-one-subject-qualification"
 FORMAT_VERSION = 1
 
 
+def _json_safe(value):
+    """Return strict-JSON data while preserving inactive/unbounded telemetry.
+
+    Numerical limiter telemetry legitimately uses +inf when an operator is
+    inactive (for example focal-loss dt for AAA/stiffening). JSON has no
+    standard infinity literal, so non-finite floating values are persisted as
+    null. The surrounding limiter fields retain the semantic meaning.
+    """
+
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, (np.floating, float)):
+        number = float(value)
+        return number if math.isfinite(number) else None
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, np.bool_):
+        return bool(value)
+    return value
+
+
 def _write(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n",
+        json.dumps(_json_safe(payload), indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
     )
 
@@ -54,6 +78,9 @@ def _limiter_record(baseline, timing) -> dict[str, object]:
     actual = int(timing.final_cycle_outer_steps)
     return {
         "minimum_dt_s": values,
+        "inactive_or_unbounded_limiters": [
+            name for name, value in values.items() if not np.isfinite(value)
+        ],
         "dominant_original_explicit_limiter": original_limiter,
         "old_explicit_equivalent_steps_per_cycle": explicit_equivalent_steps,
         "accelerated_outer_steps_per_cycle": actual,
@@ -198,7 +225,7 @@ def qualify(source: Path, report_path: Path, code_revision: str) -> dict[str, ob
     report["generated_utc"] = datetime.now(timezone.utc).isoformat()
     _write(report_path, report)
     print("\nJAX SPLIT ONE-SUBJECT QUALIFICATION: PASS", flush=True)
-    print(json.dumps(report["full_numpy_anchor"], indent=2, sort_keys=True), flush=True)
+    print(json.dumps(_json_safe(report["full_numpy_anchor"]), indent=2, sort_keys=True), flush=True)
     print(report_path, flush=True)
     return report
 
