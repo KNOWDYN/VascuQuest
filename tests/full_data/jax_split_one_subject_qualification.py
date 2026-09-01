@@ -1,16 +1,22 @@
 """Real-PWDB qualification of the structure-preserving JAX disease solver.
 
 One deterministic canonical PWDB subject is exercised through all four frozen
-Virtual Disease conditions.  The frozen NumPy/JAX semidiscrete operator gate
-is retained, while the accelerated solver is qualified for convergence,
-complete 116-segment output, limiter attribution, exact-loss execution and one
-full NumPy anchor.  This is numerical/software qualification, not clinical
+Virtual Disease conditions. The frozen NumPy/JAX semidiscrete operator gate is
+retained, while the accelerated solver is qualified for convergence, complete
+116-segment output, limiter attribution, exact-loss execution and one full
+NumPy anchor. This is numerical/software qualification, not clinical
 validation.
+
+The runner may reuse already-PASS disease cases from the explicitly trusted
+failed qualification revision when the numerical implementation is unchanged.
+Reused cases are rechecked with the current operator-equivalence gate and are
+marked with explicit evidence lineage in the new report.
 """
 
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 from dataclasses import asdict
 from datetime import datetime, timezone
 import json
@@ -31,16 +37,16 @@ from vascuquest.disease.solver.model import SolverOptions
 
 FORMAT = "vascuquest-jax-split-one-subject-qualification"
 FORMAT_VERSION = 1
+TRUSTED_REUSE_REVISIONS = {
+    "4460009bc1739a9896047c1b9a551113a0076486": (
+        "failed only during strict JSON persistence; subsequent commits changed "
+        "qualification/reporting code, not the numerical solver or disease physics"
+    ),
+}
 
 
 def _json_safe(value):
-    """Return strict-JSON data while preserving inactive/unbounded telemetry.
-
-    Numerical limiter telemetry legitimately uses +inf when an operator is
-    inactive (for example focal-loss dt for AAA/stiffening). JSON has no
-    standard infinity literal, so non-finite floating values are persisted as
-    null. The surrounding limiter fields retain the semantic meaning.
-    """
+    """Return strict-JSON data while preserving inactive/unbounded telemetry."""
 
     if isinstance(value, dict):
         return {str(key): _json_safe(item) for key, item in value.items()}
@@ -91,13 +97,86 @@ def _limiter_record(baseline, timing) -> dict[str, object]:
     }
 
 
-def qualify(source: Path, report_path: Path, code_revision: str) -> dict[str, object]:
+def _load_reusable_cases(
+    reuse_report: Path | None,
+    *,
+    baseline,
+    current_cases,
+) -> tuple[dict[str, dict[str, object]], dict[str, object] | None]:
+    if reuse_report is None or not reuse_report.exists():
+        return {}, None
+    payload = json.loads(reuse_report.read_text(encoding="utf-8"))
+    revision = str(payload.get("code_revision", ""))
+    if revision not in TRUSTED_REUSE_REVISIONS:
+        raise RuntimeError(
+            f"reuse report revision {revision!r} is not an explicitly trusted numerical-equivalence revision"
+        )
+    if payload.get("format") != FORMAT:
+        raise RuntimeError("reuse report is not a JAX split qualification report")
+    if payload.get("numerical_scheme_id") != JAX_SPLIT_SCHEME_ID:
+        raise RuntimeError("reuse report numerical scheme does not match current split solver")
+    if str(payload.get("canonical_subject_id")) != str(baseline.canonical_subject_id):
+        raise RuntimeError("reuse report canonical PWDB subject does not match current qualification")
+    if int(payload.get("source_age_years")) != int(baseline.age_years):
+        raise RuntimeError("reuse report subject age does not match current qualification")
+
+    expected = {
+        name: reference._spec_payload(spec)
+        for name, spec in current_cases
+    }
+    reusable: dict[str, dict[str, object]] = {}
+    for raw in payload.get("cases", []):
+        if not isinstance(raw, dict):
+            continue
+        name = str(raw.get("condition", ""))
+        if name not in expected or name == "large_artery_stiffening":
+            continue
+        if raw.get("specification") != expected[name]:
+            continue
+        operator = raw.get("operator_equivalence", {})
+        accelerated = raw.get("accelerated_full_solve", {})
+        diagnostics = accelerated.get("diagnostics", {}) if isinstance(accelerated, dict) else {}
+        timing = accelerated.get("timing", {}) if isinstance(accelerated, dict) else {}
+        if not (
+            isinstance(operator, dict)
+            and operator.get("passed") is True
+            and isinstance(accelerated, dict)
+            and accelerated.get("status") == "PASS"
+            and diagnostics.get("converged") is True
+            and int(accelerated.get("segments", 0)) == 116
+            and timing.get("scheme_id") == JAX_SPLIT_SCHEME_ID
+        ):
+            continue
+        reusable[name] = deepcopy(raw)
+
+    lineage = {
+        "source_report": str(reuse_report),
+        "source_code_revision": revision,
+        "reuse_basis": TRUSTED_REUSE_REVISIONS[revision],
+        "reused_conditions": sorted(reusable),
+        "current_operator_gate_reexecuted": True,
+    }
+    return reusable, lineage
+
+
+def qualify(
+    source: Path,
+    report_path: Path,
+    code_revision: str,
+    *,
+    reuse_report: Path | None = None,
+) -> dict[str, object]:
     started = time.perf_counter()
     options = SolverOptions()
     session = reference.vq.open_dataset("pwdb:3275625", source=source, offline=True)
     assembler = reference.PWDBBaselineAssembler(reference._acquisition(source), offline=True)
     baseline, cases, physics_cases, rejections = reference._select_subject(
         session, assembler, options
+    )
+    reusable, reuse_lineage = _load_reusable_cases(
+        reuse_report,
+        baseline=baseline,
+        current_cases=cases,
     )
 
     report: dict[str, object] = {
@@ -117,6 +196,7 @@ def qualify(source: Path, report_path: Path, code_revision: str) -> dict[str, ob
         },
         "reference_anchor_limits": reference.ANCHOR_LIMITS,
         "cases": [],
+        "evidence_reuse": reuse_lineage,
         "scientific_boundary": {
             "evidence": "MODELLED",
             "clinical_validation": False,
@@ -131,14 +211,31 @@ def qualify(source: Path, report_path: Path, code_revision: str) -> dict[str, ob
     ):
         if name != physics_name:
             raise RuntimeError("internal qualification case ordering mismatch")
+
         print(f"\n[{index}/4] {name}: frozen NumPy/JAX operator gate", flush=True)
         operator = reference._operator_gate(baseline, physics, options)
-
         for loss in physics.pressure_losses:
             if float(loss.inertance_pa_s2_per_m3) != 0.0:
                 raise AssertionError(
                     f"{name} unexpectedly requires nonzero excess inertance"
                 )
+
+        if name in reusable:
+            case_record = reusable[name]
+            case_record["operator_equivalence"] = operator
+            case_record["reuse_provenance"] = {
+                "reused": True,
+                "source_code_revision": reuse_lineage["source_code_revision"],
+                "reason": reuse_lineage["reuse_basis"],
+                "current_operator_gate_reexecuted": True,
+            }
+            report["cases"].append(case_record)
+            _write(report_path, report)
+            print(
+                f"[{index}/4] {name}: REUSED prior PASS full solve; current operator gate PASS",
+                flush=True,
+            )
+            continue
 
         print(f"[{index}/4] {name}: accelerated split solve", flush=True)
         solver = JaxDiseaseOneDSolver(options)
@@ -187,8 +284,6 @@ def qualify(source: Path, report_path: Path, code_revision: str) -> dict[str, ob
             flush=True,
         )
 
-    # The non-focal stiffening model avoids the pathological lesion mesh/loss
-    # restriction and is therefore retained as the complete frozen-NumPy anchor.
     anchor_name = "large_artery_stiffening"
     anchor_physics = dict(physics_cases)[anchor_name]
     print("\nAnchor: frozen NumPy full solve", flush=True)
@@ -235,9 +330,20 @@ def main() -> int:
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--code-revision", required=True)
+    parser.add_argument(
+        "--reuse-report",
+        type=Path,
+        default=None,
+        help="Optional trusted prior partial qualification report whose PASS cases may be reused.",
+    )
     args = parser.parse_args()
     try:
-        qualify(args.source, args.report, args.code_revision)
+        qualify(
+            args.source,
+            args.report,
+            args.code_revision,
+            reuse_report=args.reuse_report,
+        )
     except Exception as exc:
         payload: dict[str, object]
         if args.report.exists():
