@@ -1,12 +1,11 @@
 """Temporal-refinement gate for the accelerated JAX split solver.
 
-Uses the same deterministic real-PWDB subject and carotid-stenosis model as the
-main qualification. Spatial discretisation and disease physics are held fixed;
-only the outer wave-CFL number is halved. The production solver is advanced for
-one complete cardiac cycle from the identical initial state at every level.
-Periodic convergence is intentionally *not* part of this gate because the main
-four-disease qualification tests it separately. This isolates temporal order
-without paying for repeated multi-cycle convergence runs.
+Uses the same frozen real-PWDB subject and carotid-stenosis model as the main
+qualification. Spatial discretisation and disease physics are held fixed; only
+the outer wave-CFL number is halved. The production solver is advanced for one
+complete cardiac cycle from the identical initial state at every level.
+Periodic convergence is intentionally not part of this gate because the main
+four-disease qualification tests it separately.
 """
 
 from __future__ import annotations
@@ -26,6 +25,7 @@ from vascuquest.disease.solver.model import SolverOptions
 
 CFL_LEVELS = (0.40, 0.20, 0.10)
 MIN_OBSERVED_ORDER = 1.50
+QUALIFICATION_SUBJECT_ID = "2104"
 
 
 def _field_difference(first, second) -> dict[str, float]:
@@ -73,6 +73,8 @@ def run(source: Path, main_report: Path) -> dict[str, object]:
     payload = json.loads(main_report.read_text(encoding="utf-8"))
     if payload.get("status") != "PASS":
         raise RuntimeError("main split-solver qualification must PASS before temporal refinement")
+    if str(payload.get("canonical_subject_id")) != QUALIFICATION_SUBJECT_ID:
+        raise AssertionError("main qualification report does not use frozen subject 2104")
 
     base_options = SolverOptions(
         cfl=CFL_LEVELS[0],
@@ -80,14 +82,17 @@ def run(source: Path, main_report: Path) -> dict[str, object]:
         minimum_cycles=1,
         maximum_cycles=1,
     )
+    print("Temporal refinement: opening canonical PWDB locally...", flush=True)
     session = reference.vq.open_dataset("pwdb:3275625", source=source, offline=True)
     assembler = reference.PWDBBaselineAssembler(reference._acquisition(source), offline=True)
-    baseline, _, physics_cases, _ = reference._select_subject(
-        session, assembler, base_options
-    )
-    if baseline.canonical_subject_id != payload.get("canonical_subject_id"):
-        raise AssertionError("temporal-refinement subject differs from main qualification")
-    physics = dict(physics_cases)["carotid_stenosis"]
+    print(f"Temporal refinement: assembling frozen subject {QUALIFICATION_SUBJECT_ID}...", flush=True)
+    baseline = assembler.assemble(session, QUALIFICATION_SUBJECT_ID)
+    if str(baseline.canonical_subject_id) != QUALIFICATION_SUBJECT_ID:
+        raise AssertionError("temporal-refinement assembler returned the wrong subject")
+    cases = reference._case_specifications(baseline, base_options)
+    carotid_spec = dict(cases)["carotid_stenosis"]
+    physics = reference.transform_disease(baseline, carotid_spec, options=base_options)
+    print("Temporal refinement: frozen carotid transform ready", flush=True)
 
     solutions = []
     runs = []
@@ -146,6 +151,7 @@ def run(source: Path, main_report: Path) -> dict[str, object]:
     result = {
         "status": "PASS",
         "condition": "carotid_stenosis",
+        "canonical_subject_id": QUALIFICATION_SUBJECT_ID,
         "integration_window": "one_complete_cardiac_cycle_from_identical_initial_state",
         "periodic_convergence_tested_elsewhere": True,
         "cfl_levels": list(CFL_LEVELS),
