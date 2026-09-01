@@ -1,11 +1,10 @@
 """Real-PWDB qualification of the structure-preserving JAX disease solver.
 
-One deterministic canonical PWDB subject is exercised through all four frozen
-Virtual Disease conditions. The frozen NumPy/JAX semidiscrete operator gate is
-retained, while the accelerated solver is qualified for convergence, complete
-116-segment output, limiter attribution, exact-loss execution and one full
-NumPy anchor. This is numerical/software qualification, not clinical
-validation.
+One frozen canonical PWDB subject is exercised through all four frozen Virtual
+Disease conditions. The frozen NumPy/JAX semidiscrete operator gate is retained,
+while the accelerated solver is qualified for convergence, complete 116-segment
+output, limiter attribution, exact-loss execution and one full NumPy anchor.
+This is numerical/software qualification, not clinical validation.
 
 The runner may reuse already-PASS disease cases from the explicitly trusted
 failed qualification revision when the numerical implementation is unchanged.
@@ -37,6 +36,7 @@ from vascuquest.disease.solver.model import SolverOptions
 
 FORMAT = "vascuquest-jax-split-one-subject-qualification"
 FORMAT_VERSION = 1
+QUALIFICATION_SUBJECT_ID = "2104"
 TRUSTED_REUSE_REVISIONS = {
     "4460009bc1739a9896047c1b9a551113a0076486": (
         "failed only during strict JSON persistence; subsequent commits changed "
@@ -97,6 +97,29 @@ def _limiter_record(baseline, timing) -> dict[str, object]:
     }
 
 
+def _prepare_frozen_subject(session, assembler, options: SolverOptions):
+    """Assemble the already-qualified canonical subject without population scans."""
+
+    print(
+        f"Qualification subject: {QUALIFICATION_SUBJECT_ID} (frozen canonical PWDB subject)",
+        flush=True,
+    )
+    print("Assembling subject baseline from local PWDB artifacts...", flush=True)
+    baseline = assembler.assemble(session, QUALIFICATION_SUBJECT_ID)
+    if str(baseline.canonical_subject_id) != QUALIFICATION_SUBJECT_ID:
+        raise AssertionError("PWDB assembler returned the wrong frozen qualification subject")
+    if int(baseline.age_years) != 45:
+        raise AssertionError("frozen qualification subject 2104 no longer has expected age 45")
+    print("Baseline assembly: PASS; constructing four disease transforms...", flush=True)
+    cases = reference._case_specifications(baseline, options)
+    physics = tuple(
+        (name, reference.transform_disease(baseline, spec, options=options))
+        for name, spec in cases
+    )
+    print("Four disease transforms: PASS", flush=True)
+    return baseline, cases, physics
+
+
 def _load_reusable_cases(
     reuse_report: Path | None,
     *,
@@ -105,6 +128,7 @@ def _load_reusable_cases(
 ) -> tuple[dict[str, dict[str, object]], dict[str, object] | None]:
     if reuse_report is None or not reuse_report.exists():
         return {}, None
+    print(f"Validating trusted partial evidence: {reuse_report}", flush=True)
     payload = json.loads(reuse_report.read_text(encoding="utf-8"))
     revision = str(payload.get("code_revision", ""))
     if revision not in TRUSTED_REUSE_REVISIONS:
@@ -120,10 +144,7 @@ def _load_reusable_cases(
     if int(payload.get("source_age_years")) != int(baseline.age_years):
         raise RuntimeError("reuse report subject age does not match current qualification")
 
-    expected = {
-        name: reference._spec_payload(spec)
-        for name, spec in current_cases
-    }
+    expected = {name: reference._spec_payload(spec) for name, spec in current_cases}
     reusable: dict[str, dict[str, object]] = {}
     for raw in payload.get("cases", []):
         if not isinstance(raw, dict):
@@ -156,6 +177,7 @@ def _load_reusable_cases(
         "reused_conditions": sorted(reusable),
         "current_operator_gate_reexecuted": True,
     }
+    print(f"Reusable PASS cases: {sorted(reusable)}", flush=True)
     return reusable, lineage
 
 
@@ -168,11 +190,10 @@ def qualify(
 ) -> dict[str, object]:
     started = time.perf_counter()
     options = SolverOptions()
+    print("Opening canonical PWDB 3275625 in offline/local mode...", flush=True)
     session = reference.vq.open_dataset("pwdb:3275625", source=source, offline=True)
     assembler = reference.PWDBBaselineAssembler(reference._acquisition(source), offline=True)
-    baseline, cases, physics_cases, rejections = reference._select_subject(
-        session, assembler, options
-    )
+    baseline, cases, physics_cases = _prepare_frozen_subject(session, assembler, options)
     reusable, reuse_lineage = _load_reusable_cases(
         reuse_report,
         baseline=baseline,
@@ -188,7 +209,7 @@ def qualify(
         "canonical_subject_id": baseline.canonical_subject_id,
         "source_age_years": baseline.age_years,
         "numerical_scheme_id": JAX_SPLIT_SCHEME_ID,
-        "selection_rejections": rejections,
+        "selection_mode": "frozen_canonical_subject_no_population_scan",
         "reference_operator_limits": {
             "relative_l2": reference.OPERATOR_RELATIVE_L2_LIMIT,
             "max_scaled": reference.OPERATOR_MAX_SCALED_LIMIT,
@@ -204,6 +225,7 @@ def qualify(
         },
     }
     _write(report_path, report)
+    print(f"Qualification report initialized: {report_path}", flush=True)
 
     solutions = {}
     for index, ((name, spec), (physics_name, physics)) in enumerate(
@@ -216,9 +238,7 @@ def qualify(
         operator = reference._operator_gate(baseline, physics, options)
         for loss in physics.pressure_losses:
             if float(loss.inertance_pa_s2_per_m3) != 0.0:
-                raise AssertionError(
-                    f"{name} unexpectedly requires nonzero excess inertance"
-                )
+                raise AssertionError(f"{name} unexpectedly requires nonzero excess inertance")
 
         if name in reusable:
             case_record = reusable[name]
@@ -307,9 +327,7 @@ def qualify(
         "status": "PASS",
         "numpy_wall_seconds": numpy_wall,
         "accelerated_wall_seconds_including_compile": accelerated_wall,
-        "speedup_including_compile": float(
-            numpy_wall / max(float(accelerated_wall), 1e-12)
-        ),
+        "speedup_including_compile": float(numpy_wall / max(float(accelerated_wall), 1e-12)),
         "relative_l2_errors": errors,
         "numpy_diagnostics": asdict(numpy_solution.diagnostics),
         "accelerated_diagnostics": asdict(accelerated_solution.diagnostics),
@@ -330,12 +348,7 @@ def main() -> int:
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--code-revision", required=True)
-    parser.add_argument(
-        "--reuse-report",
-        type=Path,
-        default=None,
-        help="Optional trusted prior partial qualification report whose PASS cases may be reused.",
-    )
+    parser.add_argument("--reuse-report", type=Path)
     args = parser.parse_args()
     try:
         qualify(
