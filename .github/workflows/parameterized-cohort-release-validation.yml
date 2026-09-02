@@ -1,0 +1,126 @@
+name: JAX Virtual Disease real-source qualification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-pwdb-jax:
+    name: PWDB one-subject JAX split qualification / Python 3.12
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout qualification candidate
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile accelerated backend and qualification harness
+        run: |
+          python -m py_compile src/vascuquest/disease/solver/jax_disease.py
+          python -m py_compile src/vascuquest/disease/solver/jax_split_disease.py
+          python -m py_compile src/vascuquest/disease/solver/exact_loss.py
+          python -m py_compile src/vascuquest/disease/solver/execution.py
+          python -m py_compile src/vascuquest/disease/solver/backends.py
+          python -m py_compile src/vascuquest/disease/runtime/materialize_backend.py
+          python -m py_compile src/vascuquest/disease/cohort/execution.py
+          python -m py_compile tests/full_data/parameterized_cohort_colab_stage.py
+          python -m py_compile tests/full_data/jax_one_subject_qualification.py
+          python -m py_compile tests/full_data/jax_split_one_subject_qualification.py
+          python -m py_compile tests/full_data/jax_split_temporal_refinement.py
+
+      - name: Install qualification candidate with JAX
+        run: python -m pip install '.[jax]'
+
+      - name: Confirm frozen NumPy default and structure-preserving JAX backend
+        run: |
+          python - <<'PY'
+          import jax
+          from vascuquest.disease.solver import create_disease_solver
+          from vascuquest.disease.solver.disease_finite_volume import DiseaseOneDSolver
+          from vascuquest.disease.solver.jax_split_disease import (
+              JAX_SPLIT_SCHEME_ID,
+              JaxDiseaseOneDSolver,
+          )
+          numpy_solver = create_disease_solver()
+          jax_solver = create_disease_solver(backend='jax')
+          assert isinstance(numpy_solver, DiseaseOneDSolver)
+          assert isinstance(jax_solver, JaxDiseaseOneDSolver)
+          print('scheme:', JAX_SPLIT_SCHEME_ID)
+          print('JAX version:', jax.__version__)
+          print('JAX devices:', jax.devices())
+          PY
+
+      - name: Stage canonical PWDB artifacts to runner SSD
+        shell: bash
+        run: |
+          export XDG_DATA_HOME="$RUNNER_TEMP/vascuquest-xdg/data"
+          export XDG_CACHE_HOME="$RUNNER_TEMP/vascuquest-xdg/cache"
+          export XDG_STATE_HOME="$RUNNER_TEMP/vascuquest-xdg/state"
+          python tests/full_data/parameterized_cohort_colab_stage.py \
+            --drive-source-dir "$RUNNER_TEMP/no-mounted-drive" \
+            --local-source "$RUNNER_TEMP/pwdb-source" \
+            --report source-stage.json
+
+      - name: Run one-subject four-disease split-solver qualification
+        shell: bash
+        run: |
+          export XDG_DATA_HOME="$RUNNER_TEMP/vascuquest-xdg/data"
+          export XDG_CACHE_HOME="$RUNNER_TEMP/vascuquest-xdg/cache"
+          export XDG_STATE_HOME="$RUNNER_TEMP/vascuquest-xdg/state"
+          python tests/full_data/jax_split_one_subject_qualification.py \
+            --source "$RUNNER_TEMP/pwdb-source" \
+            --report jax-split-one-subject-qualification.json \
+            --code-revision "${{ github.sha }}"
+
+      - name: Run temporal-refinement qualification
+        shell: bash
+        run: |
+          export XDG_DATA_HOME="$RUNNER_TEMP/vascuquest-xdg/data"
+          export XDG_CACHE_HOME="$RUNNER_TEMP/vascuquest-xdg/cache"
+          export XDG_STATE_HOME="$RUNNER_TEMP/vascuquest-xdg/state"
+          python tests/full_data/jax_split_temporal_refinement.py \
+            --source "$RUNNER_TEMP/pwdb-source" \
+            --report jax-split-one-subject-qualification.json
+
+      - name: Print qualification summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f jax-split-one-subject-qualification.json ]; then
+            python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path('jax-split-one-subject-qualification.json')
+          payload = json.loads(path.read_text(encoding='utf-8'))
+          print(json.dumps({
+              'status': payload.get('status'),
+              'qualification_complete': payload.get('qualification_complete'),
+              'code_revision': payload.get('code_revision'),
+              'canonical_subject_id': payload.get('canonical_subject_id'),
+              'source_age_years': payload.get('source_age_years'),
+              'numerical_scheme_id': payload.get('numerical_scheme_id'),
+              'elapsed_seconds': payload.get('elapsed_seconds'),
+              'reference_strategy': payload.get('reference_strategy'),
+              'main_stage': payload.get('main_stage'),
+              'temporal_refinement': payload.get('temporal_refinement'),
+          }, indent=2, sort_keys=True))
+          PY
+          fi
+
+      - name: Upload machine-readable JAX qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: vascuquest-jax-split-one-subject-qualification
+          path: |
+            source-stage.json
+            jax-split-one-subject-qualification.json
+          if-no-files-found: error
+          retention-days: 90

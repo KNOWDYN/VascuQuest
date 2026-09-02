@@ -15,6 +15,7 @@ from vascuquest.disease import (
     write_cohort_plan,
 )
 from vascuquest.disease.catalogue import resolve_condition
+from vascuquest.disease.solver.backends import normalize_solver_backend
 from vascuquest.errors import AdmissibilityError
 
 from .commands import CANONICAL_DATASET, _emit, _parse_assignments
@@ -31,6 +32,13 @@ def _resolve_condition(value: str):
         return resolve_condition(value)
     except AdmissibilityError as exc:
         raise typer.BadParameter(str(exc), param_hint="condition") from exc
+
+
+def _resolve_solver_backend(value: str) -> str:
+    try:
+        return normalize_solver_backend(value)
+    except (TypeError, ValueError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="--solver-backend") from exc
 
 
 @cohort_app.command("plan")
@@ -86,6 +94,11 @@ def cohort_generate(
     plan_path: str = typer.Option(..., "--plan"),
     bundle: str = typer.Option(..., "--bundle"),
     resume: bool = typer.Option(False, "--resume"),
+    solver_backend: str = typer.Option(
+        "numpy",
+        "--solver-backend",
+        help="Numerical backend: numpy (frozen reference) or jax (accelerated split solver).",
+    ),
     dataset: str = typer.Option(CANONICAL_DATASET, "--dataset"),
     source: str | None = typer.Option(None, "--source"),
     offline: bool = typer.Option(False, "--offline"),
@@ -93,12 +106,14 @@ def cohort_generate(
     output_format: str = typer.Option("text", "--format"),
     output: str | None = typer.Option(None, "--output"),
 ) -> None:
-    """Execute a frozen plan subject-by-subject with resumable full-network persistence."""
+    """Execute a frozen plan with resumable full-network persistence."""
     plan = read_cohort_plan(Path(plan_path).expanduser())
+    backend = _resolve_solver_backend(solver_backend)
     _preflight_sources(source=source, offline=offline, yes=yes)
     typer.echo(
-        "Parameterized cohort generation: every subject runs the existing complete "
-        "Virtual Disease 116-segment solver; outputs remain MODELLED and not clinically validated.",
+        "Parameterized cohort generation: every subject runs the complete 116-segment "
+        f"Virtual Disease solver with backend={backend}; outputs remain MODELLED and "
+        "not clinically validated.",
         err=True,
     )
     path = generate_parameterized_cohort(
@@ -107,6 +122,7 @@ def cohort_generate(
         dataset=dataset,
         source=source,
         offline=offline,
+        solver_backend=backend,
         resume=resume,
     )
     _emit(inspect_parameterized_cohort_bundle(path), output_format, output)

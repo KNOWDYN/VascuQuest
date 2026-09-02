@@ -1,5 +1,11 @@
-"""Native 1-D cardiovascular solver used by Virtual Disease reconstruction."""
+"""Native and optional accelerated 1-D cardiovascular solvers."""
 
+from .backends import (
+    DiseaseSolverBackend,
+    create_disease_solver,
+    jax_backend_available,
+    normalize_solver_backend,
+)
 from .finite_volume import NativeOneDSolver
 from .model import ForwardSolution, SegmentMesh, SegmentSolution, SolverDiagnostics, SolverOptions
 from .network import (
@@ -12,6 +18,7 @@ from .network import (
 )
 
 __all__ = [
+    "DiseaseSolverBackend",
     "ForwardSolution",
     "NativeOneDSolver",
     "NetworkDiscretization",
@@ -22,6 +29,9 @@ __all__ = [
     "ThinWallLaw",
     "VoigtWallLaw",
     "build_network",
+    "create_disease_solver",
+    "jax_backend_available",
+    "normalize_solver_backend",
     "wall_eh_n_per_m",
     "wall_gamma_source",
 ]

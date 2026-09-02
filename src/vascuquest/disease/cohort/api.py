@@ -79,9 +79,10 @@ def generate_parameterized_cohort(
     source: str | Path | None = None,
     offline: bool = False,
     solver_options: SolverOptions | None = None,
+    solver_backend: str = "numpy",
     resume: bool = False,
 ) -> Path:
-    """Execute and persist one frozen parameterized cohort plan subject-by-subject."""
+    """Execute and persist one frozen cohort plan with an explicit solver backend."""
     if not isinstance(plan, ParameterizedDiseaseCohortPlan):
         raise TypeError("plan must be a ParameterizedDiseaseCohortPlan")
     session = open_dataset(dataset, source=source, offline=offline)
@@ -90,6 +91,7 @@ def generate_parameterized_cohort(
         acquirer,
         offline=offline,
         solver_options=solver_options,
+        solver_backend=solver_backend,
     )
     return generator.generate(session, plan, destination, resume=resume)
 

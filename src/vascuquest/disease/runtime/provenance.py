@@ -11,6 +11,7 @@ from vascuquest.domain.location import VascularLocation
 from vascuquest.domain.result import ValidityState, ValueState
 from vascuquest.disease.model import DiseaseQuantityStatus, DiseaseRunIdentity
 from vascuquest.disease.physics.model import DiseasePhysicsModel
+from vascuquest.disease.solver.execution import solver_execution_descriptor
 from vascuquest.disease.solver.model import SolverDiagnostics, SolverOptions
 from vascuquest.provenance import (
     ComponentReference,
@@ -21,7 +22,7 @@ from vascuquest.provenance import (
 from vascuquest.schema import load_manifest
 
 RUNTIME_METHOD_ID = "vascuquest:virtual-disease-runtime"
-RUNTIME_COMPONENT_VERSION = "1.0.0"
+RUNTIME_COMPONENT_VERSION = "1.1.0"
 
 
 def _identity_payload(identity: DatasetIdentity) -> dict[str, str]:
@@ -61,6 +62,20 @@ def runtime_component() -> ComponentReference:
     )
 
 
+def _solver_execution(
+    diagnostics: SolverDiagnostics,
+    solver_options: SolverOptions,
+) -> dict[str, object]:
+    """Describe the solver that actually produced the retained diagnostics."""
+
+    backend = (
+        "jax"
+        if diagnostics.wall_viscoelasticity_mode == "pwdb_voigt_gamma_rkc2_global_split"
+        else "numpy"
+    )
+    return solver_execution_descriptor(backend, solver_options)
+
+
 def build_runtime_provenance(
     *,
     runtime_identity: DatasetIdentity,
@@ -78,14 +93,13 @@ def build_runtime_provenance(
 ) -> ProvenanceRecord:
     """Build one MODELLED result record with explicit parent/source lineage facts.
 
-    Core provenance v1 intentionally requires direct input records to use the
-    same dataset identity. The parent PWDB identity is therefore encoded as an
-    explicit immutable parameter rather than falsifying a cross-dataset input
-    edge. Source artifact checksums still identify the canonical PWDB inputs.
+    The disease run identity describes the scientific intervention. Numerical
+    backend/scheme are recorded separately so accelerated execution never
+    changes the causal disease identity while remaining auditable.
     """
-
     if runtime_identity != subject.dataset_identity:
         raise ValueError("runtime subject identity must match runtime dataset identity")
+    execution = _solver_execution(diagnostics, solver_options)
     parameters = {
         "virtual_disease_contract": run_identity.contract_version,
         "run_id": run_identity.run_id,
@@ -97,7 +111,12 @@ def build_runtime_provenance(
         "quantity": quantity_name,
         "quantity_status": quantity_status.value,
         "modified_segment_ids": list(physics.modified_segment_ids),
-        "solver_options": asdict(solver_options),
+        "solver_execution_id": execution["solver_execution_id"],
+        "solver_execution_contract_version": execution["contract_version"],
+        "solver_backend": execution["solver_backend"],
+        "numerical_scheme_id": execution["numerical_scheme_id"],
+        "solver_precision": execution["precision"],
+        "solver_options": execution["solver_options"],
         "solver_diagnostics": asdict(diagnostics),
     }
     return ProvenanceBuilder(runtime_identity).build(
