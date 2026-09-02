@@ -1,15 +1,25 @@
 """Real-PWDB qualification of the structure-preserving JAX disease solver.
 
 One frozen canonical PWDB subject is exercised through all four frozen Virtual
-Disease conditions. The frozen NumPy/JAX semidiscrete operator gate is retained,
-while the accelerated solver is qualified for convergence, complete 116-segment
-output, limiter attribution, exact-loss execution and one full NumPy anchor.
+Disease conditions. The frozen NumPy/JAX semidiscrete operator gate is retained
+for every transformed network, while the accelerated solver is qualified for
+periodic convergence, complete 116-segment output and limiter attribution.
+Temporal refinement is the independent time-integration convergence gate.
 This is numerical/software qualification, not clinical validation.
 
-The runner may reuse already-PASS disease cases from the explicitly trusted
-failed qualification revision when the numerical implementation is unchanged.
-Reused cases are rechecked with the current operator-equivalence gate and are
-marked with explicit evidence lineage in the new report.
+A full periodic run of the frozen explicit NumPy solver is deliberately not a
+release gate. For the production PWDB Voigt wall, its explicit stability limit
+is orders of magnitude smaller than the accelerated wave-CFL step; requiring
+millions of explicit steps per cardiac cycle would test computational patience,
+not a different scientific model. The scientific reference is therefore the
+frozen semidiscrete NumPy operator, checked directly against JAX, together with
+fresh accelerated temporal self-convergence.
+
+The runner may reuse already-PASS accelerated disease cases from explicitly
+trusted revisions when comparison to the current revision proves that the
+numerical split solver and disease physics are unchanged. Reused cases always
+re-run the current NumPy/JAX operator-equivalence gate and retain evidence
+lineage in the new report.
 """
 
 from __future__ import annotations
@@ -27,7 +37,6 @@ import traceback
 import numpy as np
 
 import jax_one_subject_qualification as reference
-from vascuquest.disease.solver.disease_finite_volume import DiseaseOneDSolver
 from vascuquest.disease.solver.jax_split_disease import (
     JAX_SPLIT_SCHEME_ID,
     JaxDiseaseOneDSolver,
@@ -41,6 +50,12 @@ TRUSTED_REUSE_REVISIONS = {
     "4460009bc1739a9896047c1b9a551113a0076486": (
         "failed only during strict JSON persistence; subsequent commits changed "
         "qualification/reporting code, not the numerical solver or disease physics"
+    ),
+    "19c6a24d5ec571946440927344801d3a0a40e78d": (
+        "all four accelerated disease solves and current operator gates passed; "
+        "comparison to the qualification repair base changes only notebook, "
+        "preflight, checkpoint/provenance and tests, not the JAX split solver or "
+        "disease physics"
     ),
 }
 
@@ -150,7 +165,7 @@ def _load_reusable_cases(
         if not isinstance(raw, dict):
             continue
         name = str(raw.get("condition", ""))
-        if name not in expected or name == "large_artery_stiffening":
+        if name not in expected:
             continue
         if raw.get("specification") != expected[name]:
             continue
@@ -215,7 +230,19 @@ def qualify(
             "max_scaled": reference.OPERATOR_MAX_SCALED_LIMIT,
             "stability_relative": reference.STABILITY_RELATIVE_LIMIT,
         },
-        "reference_anchor_limits": reference.ANCHOR_LIMITS,
+        "reference_strategy": {
+            "scientific_reference": "frozen_numpy_semidiscrete_operator",
+            "full_periodic_numpy_anchor_required": False,
+            "reason": (
+                "The frozen NumPy solver advances the same semidiscrete model with an "
+                "explicit Voigt step. Real-PWDB limiter telemetry shows that this step "
+                "requires millions of updates per cardiac cycle. Numerical identity is "
+                "therefore tested directly at the semidiscrete operator/stability level; "
+                "the accelerated time integrator is independently qualified by fresh "
+                "temporal refinement over one complete cardiac cycle."
+            ),
+            "temporal_refinement_required_for_final_pass": True,
+        },
         "cases": [],
         "evidence_reuse": reuse_lineage,
         "scientific_boundary": {
@@ -227,7 +254,6 @@ def qualify(
     _write(report_path, report)
     print(f"Qualification report initialized: {report_path}", flush=True)
 
-    solutions = {}
     for index, ((name, spec), (physics_name, physics)) in enumerate(
         zip(cases, physics_cases, strict=True), start=1
     ):
@@ -279,7 +305,6 @@ def qualify(
         if not physics.pressure_losses and timing.exact_loss_updates != 0:
             raise AssertionError("non-focal disease solve unexpectedly executed focal loss updates")
 
-        solutions[name] = solution
         case_record = {
             "condition": name,
             "specification": reference._spec_payload(spec),
@@ -304,41 +329,24 @@ def qualify(
             flush=True,
         )
 
-    anchor_name = "large_artery_stiffening"
-    anchor_physics = dict(physics_cases)[anchor_name]
-    print("\nAnchor: frozen NumPy full solve", flush=True)
-    numpy_start = time.perf_counter()
-    numpy_solution = DiseaseOneDSolver(options).solve(
-        baseline,
-        anchor_physics.network,
-        pressure_losses=anchor_physics.pressure_losses,
-    )
-    numpy_wall = time.perf_counter() - numpy_start
-    reference._validate_solution(numpy_solution)
-    accelerated_solution = solutions[anchor_name]
-    errors = reference._field_equivalence(numpy_solution, accelerated_solution)
-    accelerated_wall = next(
-        item["accelerated_full_solve"]["wall_seconds"]
-        for item in report["cases"]
-        if item["condition"] == anchor_name
-    )
-    report["full_numpy_anchor"] = {
-        "condition": anchor_name,
-        "status": "PASS",
-        "numpy_wall_seconds": numpy_wall,
-        "accelerated_wall_seconds_including_compile": accelerated_wall,
-        "speedup_including_compile": float(numpy_wall / max(float(accelerated_wall), 1e-12)),
-        "relative_l2_errors": errors,
-        "numpy_diagnostics": asdict(numpy_solution.diagnostics),
-        "accelerated_diagnostics": asdict(accelerated_solution.diagnostics),
-    }
+    if len(report["cases"]) != 4:
+        raise AssertionError("qualification did not retain all four disease cases")
+    if not all(item["operator_equivalence"]["passed"] is True for item in report["cases"]):
+        raise AssertionError("one or more current operator-equivalence gates did not pass")
 
-    report["status"] = "PASS"
+    report["main_stage"] = {
+        "status": "PASS",
+        "four_disease_periodic_convergence": True,
+        "complete_116_segment_outputs": True,
+        "current_operator_equivalence": True,
+        "limiter_attribution": True,
+    }
+    report["status"] = "AWAITING_TEMPORAL_REFINEMENT"
     report["elapsed_seconds"] = time.perf_counter() - started
     report["generated_utc"] = datetime.now(timezone.utc).isoformat()
     _write(report_path, report)
-    print("\nJAX SPLIT ONE-SUBJECT QUALIFICATION: PASS", flush=True)
-    print(json.dumps(_json_safe(report["full_numpy_anchor"]), indent=2, sort_keys=True), flush=True)
+    print("\nJAX SPLIT MAIN QUALIFICATION: PASS", flush=True)
+    print("Final PASS requires temporal refinement.", flush=True)
     print(report_path, flush=True)
     return report
 
