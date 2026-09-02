@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from vascuquest._version import __version__
 from vascuquest.domain.evidence import EvidenceClass
 from vascuquest.domain.identity import DatasetIdentity, SubjectKey
@@ -11,6 +9,7 @@ from vascuquest.domain.location import VascularLocation
 from vascuquest.domain.result import ValidityState, ValueState
 from vascuquest.disease.model import DiseaseQuantityStatus, DiseaseRunIdentity
 from vascuquest.disease.physics.model import DiseasePhysicsModel
+from vascuquest.disease.solver.execution import solver_execution_descriptor
 from vascuquest.disease.solver.model import SolverDiagnostics, SolverOptions
 from vascuquest.provenance import (
     ComponentReference,
@@ -22,8 +21,6 @@ from vascuquest.schema import load_manifest
 
 RUNTIME_METHOD_ID = "vascuquest:virtual-disease-runtime"
 RUNTIME_COMPONENT_VERSION = "1.1.0"
-JAX_SPLIT_SCHEME_ID = "jax-exact-loss-rkc2-voigt-ssprk2-v1"
-NUMPY_REFERENCE_SCHEME_ID = "numpy-explicit-ssprk2-vd1"
 
 
 def _identity_payload(identity: DatasetIdentity) -> dict[str, str]:
@@ -63,10 +60,18 @@ def runtime_component() -> ComponentReference:
     )
 
 
-def _solver_execution(diagnostics: SolverDiagnostics) -> tuple[str, str]:
-    if diagnostics.wall_viscoelasticity_mode == "pwdb_voigt_gamma_rkc2_global_split":
-        return "jax", JAX_SPLIT_SCHEME_ID
-    return "numpy", NUMPY_REFERENCE_SCHEME_ID
+def _solver_execution(
+    diagnostics: SolverDiagnostics,
+    solver_options: SolverOptions,
+) -> dict[str, object]:
+    """Describe the solver that actually produced the retained diagnostics."""
+
+    backend = (
+        "jax"
+        if diagnostics.wall_viscoelasticity_mode == "pwdb_voigt_gamma_rkc2_global_split"
+        else "numpy"
+    )
+    return solver_execution_descriptor(backend, solver_options)
 
 
 def build_runtime_provenance(
@@ -92,7 +97,7 @@ def build_runtime_provenance(
     """
     if runtime_identity != subject.dataset_identity:
         raise ValueError("runtime subject identity must match runtime dataset identity")
-    solver_backend, numerical_scheme = _solver_execution(diagnostics)
+    execution = _solver_execution(diagnostics, solver_options)
     parameters = {
         "virtual_disease_contract": run_identity.contract_version,
         "run_id": run_identity.run_id,
@@ -104,11 +109,22 @@ def build_runtime_provenance(
         "quantity": quantity_name,
         "quantity_status": quantity_status.value,
         "modified_segment_ids": list(physics.modified_segment_ids),
-        "solver_backend": solver_backend,
-        "numerical_scheme_id": numerical_scheme,
-        "solver_precision": "float64",
-        "solver_options": asdict(solver_options),
-        "solver_diagnostics": asdict(diagnostics),
+        "solver_execution_id": execution["solver_execution_id"],
+        "solver_execution_contract_version": execution["contract_version"],
+        "solver_backend": execution["solver_backend"],
+        "numerical_scheme_id": execution["numerical_scheme_id"],
+        "solver_precision": execution["precision"],
+        "solver_options": execution["solver_options"],
+        "solver_diagnostics": {
+            "cycles_completed": diagnostics.cycles_completed,
+            "periodicity_error": diagnostics.periodicity_error,
+            "converged": diagnostics.converged,
+            "minimum_area_ratio": diagnostics.minimum_area_ratio,
+            "maximum_cfl": diagnostics.maximum_cfl,
+            "maximum_diffusion_number": diagnostics.maximum_diffusion_number,
+            "terminal_mass_balance_relative_error": diagnostics.terminal_mass_balance_relative_error,
+            "wall_viscoelasticity_mode": diagnostics.wall_viscoelasticity_mode,
+        },
     }
     return ProvenanceBuilder(runtime_identity).build(
         evidence=EvidenceClass.MODELLED,
@@ -136,8 +152,6 @@ def build_runtime_provenance(
 
 
 __all__ = [
-    "JAX_SPLIT_SCHEME_ID",
-    "NUMPY_REFERENCE_SCHEME_ID",
     "RUNTIME_COMPONENT_VERSION",
     "RUNTIME_METHOD_ID",
     "build_runtime_provenance",
