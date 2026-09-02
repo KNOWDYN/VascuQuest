@@ -71,8 +71,10 @@ def _validate_one_cycle_solution(solution) -> None:
 
 def run(source: Path, main_report: Path) -> dict[str, object]:
     payload = json.loads(main_report.read_text(encoding="utf-8"))
-    if payload.get("status") != "PASS":
-        raise RuntimeError("main split-solver qualification must PASS before temporal refinement")
+    if payload.get("status") not in {"AWAITING_TEMPORAL_REFINEMENT", "PASS"}:
+        raise RuntimeError("main split-solver qualification stage must pass before temporal refinement")
+    if payload.get("main_stage", {}).get("status") != "PASS":
+        raise RuntimeError("main four-disease/operator qualification stage is not PASS")
     if str(payload.get("canonical_subject_id")) != QUALIFICATION_SUBJECT_ID:
         raise AssertionError("main qualification report does not use frozen subject 2104")
 
@@ -162,6 +164,8 @@ def run(source: Path, main_report: Path) -> dict[str, object]:
         "runs": runs,
     }
     payload["temporal_refinement"] = result
+    payload["status"] = "PASS"
+    payload["qualification_complete"] = True
     main_report.write_text(
         json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
