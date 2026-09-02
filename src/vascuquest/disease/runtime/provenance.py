@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
+
 from vascuquest._version import __version__
 from vascuquest.domain.evidence import EvidenceClass
 from vascuquest.domain.identity import DatasetIdentity, SubjectKey
@@ -115,16 +117,7 @@ def build_runtime_provenance(
         "numerical_scheme_id": execution["numerical_scheme_id"],
         "solver_precision": execution["precision"],
         "solver_options": execution["solver_options"],
-        "solver_diagnostics": {
-            "cycles_completed": diagnostics.cycles_completed,
-            "periodicity_error": diagnostics.periodicity_error,
-            "converged": diagnostics.converged,
-            "minimum_area_ratio": diagnostics.minimum_area_ratio,
-            "maximum_cfl": diagnostics.maximum_cfl,
-            "maximum_diffusion_number": diagnostics.maximum_diffusion_number,
-            "terminal_mass_balance_relative_error": diagnostics.terminal_mass_balance_relative_error,
-            "wall_viscoelasticity_mode": diagnostics.wall_viscoelasticity_mode,
-        },
+        "solver_diagnostics": asdict(diagnostics),
     }
     return ProvenanceBuilder(runtime_identity).build(
         evidence=EvidenceClass.MODELLED,
