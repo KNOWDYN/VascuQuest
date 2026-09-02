@@ -16,10 +16,10 @@ frozen semidiscrete NumPy operator, checked directly against JAX, together with
 fresh accelerated temporal self-convergence.
 
 The runner may reuse already-PASS accelerated disease cases from explicitly
-trusted revisions when comparison to the current revision proves that the
-numerical split solver and disease physics are unchanged. Reused cases always
-re-run the current NumPy/JAX operator-equivalence gate and retain evidence
-lineage in the new report.
+trusted revisions only when a git-diff lineage check proves that the numerical
+split solver, frozen reference, baseline reconstruction and disease physics are
+unchanged. Reused cases always re-run the current NumPy/JAX operator-equivalence
+gate and retain evidence lineage in the new report.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ from datetime import datetime, timezone
 import json
 import math
 from pathlib import Path
+import subprocess
 import time
 import traceback
 
@@ -53,11 +54,23 @@ TRUSTED_REUSE_REVISIONS = {
     ),
     "19c6a24d5ec571946440927344801d3a0a40e78d": (
         "all four accelerated disease solves and current operator gates passed; "
-        "comparison to the qualification repair base changes only notebook, "
-        "preflight, checkpoint/provenance and tests, not the JAX split solver or "
-        "disease physics"
+        "reuse is permitted only after the runner independently verifies unchanged "
+        "numerical/reference/baseline/disease implementation paths"
     ),
 }
+NUMERICAL_REUSE_PATHS = (
+    "src/vascuquest/disease/baseline",
+    "src/vascuquest/disease/catalogue.py",
+    "src/vascuquest/disease/physics",
+    "src/vascuquest/disease/solver/boundaries.py",
+    "src/vascuquest/disease/solver/disease_finite_volume.py",
+    "src/vascuquest/disease/solver/exact_loss.py",
+    "src/vascuquest/disease/solver/jax_disease.py",
+    "src/vascuquest/disease/solver/jax_split_disease.py",
+    "src/vascuquest/disease/solver/losses.py",
+    "src/vascuquest/disease/solver/model.py",
+    "src/vascuquest/disease/solver/network.py",
+)
 
 
 def _json_safe(value):
@@ -135,11 +148,69 @@ def _prepare_frozen_subject(session, assembler, options: SolverOptions):
     return baseline, cases, physics
 
 
+def _validate_reuse_lineage(
+    source_revision: str,
+    current_revision: str,
+) -> dict[str, object]:
+    """Prove that retained accelerated evidence crosses no numerical code change."""
+
+    try:
+        repo_root = subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"], text=True
+        ).strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError(
+            "qualification evidence reuse requires execution inside the VascuQuest git checkout"
+        ) from exc
+
+    for revision in (source_revision, current_revision):
+        probe = subprocess.run(
+            ["git", "-C", repo_root, "cat-file", "-e", f"{revision}^{{commit}}"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if probe.returncode != 0:
+            raise RuntimeError(
+                f"qualification evidence lineage commit {revision!r} is unavailable; fetch it before reuse"
+            )
+
+    command = [
+        "git",
+        "-C",
+        repo_root,
+        "diff",
+        "--name-only",
+        source_revision,
+        current_revision,
+        "--",
+        *NUMERICAL_REUSE_PATHS,
+    ]
+    changed = [
+        item
+        for item in subprocess.check_output(command, text=True).splitlines()
+        if item.strip()
+    ]
+    if changed:
+        raise RuntimeError(
+            "trusted qualification evidence cannot cross numerical/scientific code changes: "
+            + ", ".join(changed)
+        )
+    return {
+        "status": "PASS",
+        "source_revision": source_revision,
+        "current_revision": current_revision,
+        "changed_numerical_paths": [],
+        "protected_paths": list(NUMERICAL_REUSE_PATHS),
+    }
+
+
 def _load_reusable_cases(
     reuse_report: Path | None,
     *,
     baseline,
     current_cases,
+    code_revision: str,
 ) -> tuple[dict[str, dict[str, object]], dict[str, object] | None]:
     if reuse_report is None or not reuse_report.exists():
         return {}, None
@@ -150,6 +221,7 @@ def _load_reusable_cases(
         raise RuntimeError(
             f"reuse report revision {revision!r} is not an explicitly trusted numerical-equivalence revision"
         )
+    lineage_check = _validate_reuse_lineage(revision, code_revision)
     if payload.get("format") != FORMAT:
         raise RuntimeError("reuse report is not a JAX split qualification report")
     if payload.get("numerical_scheme_id") != JAX_SPLIT_SCHEME_ID:
@@ -189,6 +261,7 @@ def _load_reusable_cases(
         "source_report": str(reuse_report),
         "source_code_revision": revision,
         "reuse_basis": TRUSTED_REUSE_REVISIONS[revision],
+        "numerical_lineage_check": lineage_check,
         "reused_conditions": sorted(reusable),
         "current_operator_gate_reexecuted": True,
     }
@@ -213,6 +286,7 @@ def qualify(
         reuse_report,
         baseline=baseline,
         current_cases=cases,
+        code_revision=code_revision,
     )
 
     report: dict[str, object] = {
@@ -273,6 +347,7 @@ def qualify(
                 "reused": True,
                 "source_code_revision": reuse_lineage["source_code_revision"],
                 "reason": reuse_lineage["reuse_basis"],
+                "numerical_lineage_check": reuse_lineage["numerical_lineage_check"],
                 "current_operator_gate_reexecuted": True,
             }
             report["cases"].append(case_record)
