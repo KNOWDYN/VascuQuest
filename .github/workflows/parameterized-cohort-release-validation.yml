@@ -26,6 +26,7 @@ jobs:
           python -m py_compile src/vascuquest/disease/solver/jax_disease.py
           python -m py_compile src/vascuquest/disease/solver/jax_split_disease.py
           python -m py_compile src/vascuquest/disease/solver/exact_loss.py
+          python -m py_compile src/vascuquest/disease/solver/execution.py
           python -m py_compile src/vascuquest/disease/solver/backends.py
           python -m py_compile src/vascuquest/disease/runtime/materialize_backend.py
           python -m py_compile src/vascuquest/disease/cohort/execution.py
@@ -100,12 +101,14 @@ jobs:
           payload = json.loads(path.read_text(encoding='utf-8'))
           print(json.dumps({
               'status': payload.get('status'),
+              'qualification_complete': payload.get('qualification_complete'),
               'code_revision': payload.get('code_revision'),
               'canonical_subject_id': payload.get('canonical_subject_id'),
               'source_age_years': payload.get('source_age_years'),
               'numerical_scheme_id': payload.get('numerical_scheme_id'),
               'elapsed_seconds': payload.get('elapsed_seconds'),
-              'full_numpy_anchor': payload.get('full_numpy_anchor'),
+              'reference_strategy': payload.get('reference_strategy'),
+              'main_stage': payload.get('main_stage'),
               'temporal_refinement': payload.get('temporal_refinement'),
           }, indent=2, sort_keys=True))
           PY
