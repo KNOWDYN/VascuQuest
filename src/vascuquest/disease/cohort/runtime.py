@@ -10,11 +10,12 @@ from vascuquest.data import ArtifactAcquirer
 from vascuquest.domain.identity import DatasetIdentity
 from vascuquest.disease.baseline import PWDBBaselineAssembler
 from vascuquest.disease.model import DiseasePopulationRequest, DiseaseRunIdentity
-from vascuquest.disease.runtime.materialize import materialize_subject
+from vascuquest.disease.runtime.materialize_backend import materialize_subject_with_backend
+from vascuquest.disease.solver.backends import normalize_solver_backend
 from vascuquest.disease.solver.model import SolverOptions
 from vascuquest.errors import IntegrityError
 
-from .bundle import ParameterizedDiseaseCohortBundleWriter
+from .execution import ExecutionAwareCohortBundleWriter, solver_execution_descriptor
 from .model import DiseaseCohortAssignment, ParameterizedDiseaseCohortPlan
 
 COHORT_RUNTIME_IDENTIFIER_PREFIX = "urn:vascuquest:virtual-disease-cohort:"
@@ -55,12 +56,13 @@ def subject_disease_run_identity(
 class ParameterizedDiseaseCohortGenerator:
     """Execute a frozen cohort plan one complete PWDB subject at a time.
 
-    Existing Virtual Disease transformation and solver implementations are
-    reused unchanged. Heavy subject state is persisted immediately and then
-    released, so memory use is approximately independent of cohort size.
+    NumPy remains the default/reference backend.  An explicitly selected JAX
+    backend uses the structure-preserving accelerated solver while retaining
+    the same subject plan, disease transformation and materialisation contract.
+    Completed subjects are persisted atomically and released immediately.
     """
 
-    __slots__ = ("_assembler", "_options")
+    __slots__ = ("_assembler", "_options", "_solver_backend", "_execution")
 
     def __init__(
         self,
@@ -68,6 +70,7 @@ class ParameterizedDiseaseCohortGenerator:
         *,
         offline: bool = False,
         solver_options: SolverOptions | None = None,
+        solver_backend: str = "numpy",
     ) -> None:
         if not isinstance(acquirer, ArtifactAcquirer):
             raise TypeError("acquirer must be an ArtifactAcquirer")
@@ -77,10 +80,23 @@ class ParameterizedDiseaseCohortGenerator:
         self._options = SolverOptions() if solver_options is None else solver_options
         if not isinstance(self._options, SolverOptions):
             raise TypeError("solver_options must be a SolverOptions or None")
+        self._solver_backend = normalize_solver_backend(solver_backend)
+        self._execution = solver_execution_descriptor(
+            self._solver_backend,
+            self._options,
+        )
 
     @property
     def solver_options(self) -> SolverOptions:
         return self._options
+
+    @property
+    def solver_backend(self) -> str:
+        return self._solver_backend
+
+    @property
+    def solver_execution(self) -> dict[str, object]:
+        return dict(self._execution)
 
     def generate(
         self,
@@ -100,10 +116,11 @@ class ParameterizedDiseaseCohortGenerator:
             raise TypeError("resume must be a boolean")
 
         runtime_identity = cohort_runtime_dataset_identity(plan)
-        writer = ParameterizedDiseaseCohortBundleWriter(
+        writer = ExecutionAwareCohortBundleWriter(
             destination,
             plan,
             runtime_identity,
+            execution=self._execution,
             resume=resume,
         )
 
@@ -119,17 +136,19 @@ class ParameterizedDiseaseCohortGenerator:
             subject_run = subject_disease_run_identity(plan, assignment)
             print(
                 f"[{index}/{plan.request.patients}] subject {subject_id}: "
-                f"{assignment.severity_parameter}={assignment.severity_value:.6g} solving",
+                f"{assignment.severity_parameter}={assignment.severity_value:.6g} "
+                f"solving backend={self._solver_backend}",
                 flush=True,
             )
             try:
-                state = materialize_subject(
+                state = materialize_subject_with_backend(
                     session,
                     runtime_identity=runtime_identity,
                     run_identity=subject_run,
                     subject_id=subject_id,
                     assembler=self._assembler,
                     solver_options=self._options,
+                    solver_backend=self._solver_backend,
                 )
                 writer.write_subject(
                     assignment,

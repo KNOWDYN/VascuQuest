@@ -39,6 +39,9 @@ dependencies = [
 vascuquest = "vascuquest.cli.app:main"
 
 [project.optional-dependencies]
+jax = [
+    "jax>=0.5",
+]
 dev = [
     "build>=1.2",
     "mypy>=1.15",

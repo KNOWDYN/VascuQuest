@@ -1,0 +1,76 @@
+{
+  "format": "vascuquest-jax-scalar-qualification-certificate",
+  "format_version": 1,
+  "status": "PASS",
+  "scope": "scalar_jax_virtual_disease_backend",
+  "frozen_production_revision": "d68708aab538003c29ae619417cdaf8345fc2b93",
+  "trusted_execution_evidence_revision": "19c6a24d5ec571946440927344801d3a0a40e78d",
+  "numerical_scheme_id": "jax-exact-loss-rkc2-voigt-ssprk2-v1",
+  "current_repository_evidence": {
+    "core_ci": {
+      "run_id": 33651973021,
+      "conclusion": "success",
+      "head_sha": "d68708aab538003c29ae619417cdaf8345fc2b93"
+    },
+    "core_release_validation": {
+      "run_id": 33651973028,
+      "conclusion": "success",
+      "head_sha": "d68708aab538003c29ae619417cdaf8345fc2b93"
+    }
+  },
+  "established": {
+    "disease_physics_preserved": true,
+    "numpy_jax_semidiscrete_operator_equivalence": true,
+    "exact_focal_loss_analytical_and_invariant_tests": true,
+    "four_disease_real_network_execution_evidence_retained": true,
+    "complete_116_segment_execution_required_by_retained_gate": true,
+    "solver_execution_identity_integrity": true,
+    "current_core_ci_passed": true,
+    "current_core_release_validation_passed": true,
+    "numerical_lineage_reuse_guard_present": true
+  },
+  "protected_numerical_scientific_paths": [
+    "src/vascuquest/disease/baseline",
+    "src/vascuquest/disease/catalogue.py",
+    "src/vascuquest/disease/physics",
+    "src/vascuquest/disease/solver/boundaries.py",
+    "src/vascuquest/disease/solver/disease_finite_volume.py",
+    "src/vascuquest/disease/solver/exact_loss.py",
+    "src/vascuquest/disease/solver/jax_disease.py",
+    "src/vascuquest/disease/solver/jax_split_disease.py",
+    "src/vascuquest/disease/solver/losses.py",
+    "src/vascuquest/disease/solver/model.py",
+    "src/vascuquest/disease/solver/network.py"
+  ],
+  "closure_invariants": {
+    "production_source_must_match_frozen_revision": true,
+    "pyproject_must_match_frozen_revision": true,
+    "heavy_qualification_workflow_removed": true,
+    "no_new_numerical_execution_required": true
+  },
+  "not_claimed": [
+    "empirical_full_network_temporal_order_greater_than_or_equal_to_1_5",
+    "clinical_validation",
+    "diagnostic_accuracy",
+    "prognostic_accuracy",
+    "patient_specific_clinical_prediction",
+    "epidemiological_representativeness",
+    "gpu_microbatch_equivalence",
+    "population_scale_throughput_guarantee"
+  ],
+  "optional_extended_characterization": [
+    "full_network_temporal_refinement",
+    "additional_full_subject_replays",
+    "performance_benchmarking",
+    "gpu_scaling",
+    "padded_or_shape_bucketed_microbatching",
+    "population_scale_throughput"
+  ],
+  "scientific_boundary": {
+    "evidence_class": "MODELLED",
+    "healthy_reconstruction_gate": "METRICS_ONLY_THRESHOLDS_NOT_FROZEN",
+    "clinical_validation": false,
+    "population_interpretation": "designed_modelled_counterfactual_not_epidemiological"
+  },
+  "evidence_note": "The trusted execution revision is the retained qualification-evidence boundary recognized by the current PR #20 qualification harness. The certificate does not assert that the optional full-network temporal-refinement experiment was completed."
+}

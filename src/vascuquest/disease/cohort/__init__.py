@@ -5,9 +5,9 @@ from .bundle import (
     ParameterizedDiseaseCohortBundleWriter,
     inspect_parameterized_cohort_bundle,
     read_cohort_plan,
-    verify_parameterized_cohort_bundle,
     write_cohort_plan,
 )
+from .execution import verify_execution_aware_cohort_bundle as verify_parameterized_cohort_bundle
 from .model import (
     DiseaseCohortAssignment,
     DiseaseCohortRejection,
