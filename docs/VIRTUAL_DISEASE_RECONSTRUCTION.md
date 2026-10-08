@@ -1,155 +1,192 @@
-# Virtual Disease healthy reconstruction
+# Virtual Disease healthy reconstruction and forward-solver foundation
 
-## PR 2 status
+## 1. Purpose
 
-This document describes implementation stage 2 of 5 for the first-party VascuQuest Virtual Disease subsystem.
+Virtual Disease requires an independent healthy cardiovascular reconstruction before any disease transformation is applied. The purpose is to ensure that disease parameters represent causal interventions rather than hidden calibration knobs used to compensate for an inaccurate healthy baseline.
 
-PR 2 adds the **healthy reconstruction and forward-solver foundation only**. It does not impose any disease condition, generate a diseased population, create a runtime disease backend, or expose a disease-generation CLI.
+The healthy reconstruction layer is part of the completed VascuQuest 1.0 Virtual Disease subsystem. It is not a future/staged capability.
 
-## Purpose
+## 2. Scientific boundary
 
-Before a disease transformation can be trusted, VascuQuest must be able to reconstruct an unchanged PWDB virtual subject and propagate that subject through an independent cardiovascular solver. Disease parameters must never be used to compensate for baseline solver error.
+The healthy parent state is an immutable solver-ready representation of one canonical PWDB virtual subject assembled from verified source artifacts.
 
-The PR therefore introduces two separate capabilities:
+The reconstruction layer:
 
-1. assembly of one immutable, solver-ready healthy PWDB cardiovascular state from already verified canonical artifacts; and
-2. an independent NumPy implementation of the one-dimensional compliant-artery forward model used to calculate a complete arterial pressure/flow/area state.
+- preserves canonical PWDB subject identity;
+- reads source/configuration values needed by the disease solver;
+- preserves source arterial topology and geometry;
+- reconstructs the healthy aortic inflow from source waveforms;
+- propagates the healthy state through the first-party 1-D cardiovascular solver;
+- provides the baseline against which disease transformations operate.
 
-The existing canonical PWDB backend, canonical schema, public `DatasetSession`, derivations, exporters and CLI remain unchanged.
+It does not modify canonical PWDB artifacts and does not turn the reconstructed subject into a clinical patient model.
 
-## Baseline assembly
+## 3. Baseline assembly
 
-`PWDBBaselineAssembler` accepts an existing canonical PWDB `DatasetSession` and the existing `ArtifactAcquirer`. It reads only source inputs needed by the solver:
+`PWDBBaselineAssembler` consumes an existing canonical PWDB `DatasetSession` and trusted artifact access. The solver-ready healthy state includes, as required by the model:
 
-- exact canonical subject identity;
-- age, heart rate, stroke volume, LVET and peak-flow timing;
+- canonical subject identity;
+- source age and cardiac timing/flow inputs;
+- heart rate, stroke volume, LVET, and peak-flow timing;
 - blood density and viscosity;
-- momentum correction parameter;
-- diastolic, mean and outlet pressure inputs;
-- systemic peripheral resistance;
-- PWDB wall stiffness coefficients `k1`, `k2`, `k3`;
-- PWDB Voigt wall coefficients `b0`, `b1`;
-- all source-provided arterial segment lengths, inlet/outlet radii and topology;
-- source terminal resistance and compliance values.
+- momentum/friction parameters used by the source-compatible model;
+- pressure/outlet/systemic-resistance inputs;
+- PWDB wall stiffness coefficients;
+- PWDB Voigt-wall coefficients;
+- all source-defined arterial segment lengths, inlet/outlet radii, and topology;
+- source terminal resistance/compliance parameters.
 
-Parameters not exposed through the ordinary public VascuQuest schema are read through a disease-private bounded reader from the same checksum-verified `model_configurations` artifact. This does not widen or modify the canonical PWDB backend.
+Some solver-specific configuration fields are accessed through bounded disease-private readers over the same checksum-verified PWDB artifacts. This does not widen or redefine the public PWDB scientific schema.
 
-## Preserved aortic inflow
+## 4. Preserved aortic inflow
 
-The healthy inlet forcing is reconstructed directly from the canonical PWDB aortic-root source waveforms:
+Healthy inlet forcing is reconstructed from the canonical PWDB aortic-root velocity and area waveforms:
 
 ```text
 Q(t) = U(t) A(t)
 ```
 
-This is appropriate for Gate 0 because it preserves the selected virtual subject's original cardiac forcing exactly. The four frozen v1 disease presets are arterial interventions and do not modify cardiac inflow.
+This preserves the selected virtual subject's original cardiac forcing for the arterial disease experiments.
 
-No new cardiac-flow generator is introduced in this stage.
+The four frozen v1 disease presets are arterial interventions and do not introduce a new cardiac-flow generator.
 
-## Native one-dimensional solver
+## 5. One-dimensional cardiovascular model
 
-The solver is a first-party NumPy implementation and does not require MATLAB or Nektar1D at VascuQuest runtime.
-
-It retains the PWDB-compatible causal model:
+The first-party solver retains the source-compatible one-dimensional compliant-artery model, including:
 
 - conservation of arterial cross-sectional area/mass;
 - conservation of momentum;
 - subject-specific tapered arterial geometry;
-- PWDB/Nektar square-root pressure-area (`beta`) wall law;
-- PWDB `Eh(k1,k2,k3,Rd)` stiffness relation;
-- PWDB source Voigt-wall `Gamma` relation;
-- blood-friction source term;
-- aortic volumetric-flow inlet;
-- characteristic coupling at arterial junctions;
-- three-element RCR/Windkessel terminal beds.
+- square-root pressure-area (`beta`) wall relation;
+- source-compatible radius/stiffness parameterization;
+- Voigt wall-viscoelastic contribution where represented by the model;
+- blood-friction/source terms;
+- prescribed aortic volumetric-flow inlet;
+- arterial junction coupling;
+- terminal RCR/Windkessel beds.
 
-The numerical implementation uses conservative finite-volume integration with MUSCL reconstruction, an HLL-type interface flux, SSP-RK2 time stepping, CFL/diffusive stability control and cycle-to-cycle periodic convergence.
+The numerical discretization is an implementation choice and does not redefine PWDB source physiology.
 
-The discretisation is an implementation choice. It does not redefine the PWDB physiological model.
+## 6. Reference implementation
 
-## Numerical verification
+The NumPy implementation is the reference/default Virtual Disease backend.
 
-Fast synthetic tests exercise model invariants independently of PWDB output agreement. In particular, a vessel supplied with zero inflow and outlet pressure equal to its reference diastolic pressure must remain at zero flow and reference pressure rather than spontaneously generating a pulse.
+The network solver uses the documented finite-volume disease implementation and converges the system to a periodic cardiac-cycle state under its numerical controls. Solver execution identity is preserved so a persisted result can be tied to the exact numerical route used.
 
-Additional checks cover:
+## 7. Optional JAX backend
 
-- pressure-area inversion;
-- tapered reference-state pressure consistency;
-- positive stiffness coefficients;
-- terminal Windkessel equilibrium;
+VascuQuest also provides an optional JAX execution backend for the same declared disease model. The JAX backend is optional and isolated behind the `jax` extra.
+
+Its qualification is evidence-based and scope-specific. VascuQuest does not generalize the available JAX qualification into unsupported claims about GPU microbatch equivalence, clinical validity, or empirical full-network convergence order beyond what is recorded by its evidence.
+
+The NumPy reference behavior remains the scientific baseline for the disease model.
+
+See [`JAX_VIRTUAL_DISEASE_QUALIFICATION.md`](JAX_VIRTUAL_DISEASE_QUALIFICATION.md) and the frozen machine-readable certificate in `docs/evidence/` for the exact qualified lineage.
+
+## 8. Healthy no-intervention logic
+
+A healthy reconstruction is conceptually distinct from a disease no-op. Disease transforms must reduce exactly to the healthy model when their intervention parameter is defined as zero/no-op.
+
+This property prevents a “zero disease” request from changing geometry or introducing artificial loss.
+
+## 9. Numerical verification
+
+Fast numerical tests exercise fundamental model invariants independently of source-output agreement. Examples include:
+
+- pressure-area forward/inverse consistency;
+- physically admissible positive stiffness/area states;
+- terminal-bed equilibrium behavior;
+- junction/boundary consistency;
 - finite solver output;
-- cycle convergence;
-- terminal mass balance;
-- bounded source-configuration parsing.
+- stable zero/steady reference states;
+- deterministic execution identity.
 
-These are numerical/software verification checks, not clinical validation.
+These tests are necessary but are not, by themselves, clinical validation.
 
-## Gate 0 reconstruction evidence
+## 10. Reconstruction qualification and frozen evidence labels
 
-`HealthyReconstructionValidator` compares the solver's final healthy cycle against canonical PWDB common-site source waves at all 13 exported sites:
+Healthy reconstruction qualification compares the independent solver output with source-supported PWDB haemodynamic behavior using the documented reconstruction metrics/gates.
 
-| Site | PWDB segment | Axial fraction |
-|---|---:|---:|
-| AorticRoot | 1 | 0.00 |
-| ThorAorta | 18 | 1.00 |
-| AbdAorta | 39 | 0.00 |
-| IliacBif | 41 | 1.00 |
-| Carotid | 15 | 0.50 |
-| SupTemporal | 87 | 1.00 |
-| SupMidCerebral | 72 | 1.00 |
-| Brachial | 21 | 0.75 |
-| Radial | 22 | 1.00 |
-| Digital | 112 | 1.00 |
-| CommonIliac | 44 | 0.50 |
-| Femoral | 46 | 0.50 |
-| AntTibial | 49 | 1.00 |
+A critical documentation rule applies here:
 
-For each site the validator compares:
+> Qualification-state labels belong to the exact evidence lineage that recorded them. Documentation must neither silently upgrade them nor present a frozen historical label as though it describes every current VascuQuest 1.0 capability.
 
-```text
-P
-U
-A
-Q = U*A
-```
-
-and records, without applying a qualification threshold:
-
-- normalized RMSE;
-- relative mean error;
-- peak relative error;
-- trough relative error;
-- circular phase error.
-
-## Qualification state
-
-PR 2 intentionally permits exactly one Gate-0 qualification state:
+For example, the JAX and parameterized-cohort qualification records preserve the label:
 
 ```text
 METRICS_ONLY_THRESHOLDS_NOT_FROZEN
 ```
 
-No `PASS`, `VALIDATED`, or equivalent state exists in this implementation stage.
+because that is part of their frozen evidence contract. It must remain unchanged inside those qualification records and persisted bundles where recorded.
 
-Real-source reconstruction results must be inspected before numerical acceptance tolerances are frozen. A solver that executes successfully is not thereby proven to reproduce PWDB sufficiently closely for disease generation.
+That label does **not** mean that Virtual Disease, HEMOSPACE, or the v1 analysis stack is unfinished. VascuQuest 1.0 has a completed mechanistic Virtual Disease implementation with explicit qualification boundaries; the frozen label specifically states the reconstruction-threshold status carried by that evidence lineage.
 
-## PR 2 non-goals
+A reconstruction metric is evidence about agreement with the source model; it is not evidence that PWDB itself is a clinical patient model.
 
-PR 2 contains no:
+## 11. Disease separation rule
 
-- carotid-stenosis transformation;
-- iliac-stenosis transformation;
-- aneurysm transformation;
-- arterial-stiffening transformation;
-- Young-Seeley disease pressure-loss term;
-- runtime virtual-disease dataset;
-- disease-qualified runtime vectors;
-- virtual-disease population generation;
-- disease CLI command;
-- clinical validation claim.
+Disease transformations are applied only after the healthy parent state has been assembled. A disease transform receives:
 
-Those remain gated behind subsequent PRs.
+```text
+healthy BaselineCardiovascularState
++ DiseaseSpecification
+→ DiseasePhysicsModel
+```
 
-## Gate for PR 3
+The healthy parent remains unchanged. Disease geometry/wall/loss changes live in the separate modelled disease state.
 
-PR 3 may add the frozen disease transformations only on top of this healthy reconstruction layer. Disease transformations must not be tuned to cancel healthy reconstruction errors. Full production validity still requires the later real-source qualification workflow and the complete four-layer credibility programme.
+## 12. Geometry and topology
+
+The healthy model uses the source 116-segment arterial network. Disease targeting operates on canonical arterial segment identity, not on the smaller set of common waveform measurement sites.
+
+This distinction prevents measurement-site labels from being repurposed as anatomical disease definitions.
+
+## 13. Boundary and terminal behavior
+
+The forward model includes explicit inlet, junction, and terminal-bed behavior. Terminal parameterization belongs to the healthy solver-ready subject state and is propagated consistently into disease calculations unless the disease specification explicitly modifies the relevant model parameter.
+
+Downstream v1 analysis code cannot modify these boundary/terminal equations.
+
+## 14. Reproducibility
+
+A healthy reconstruction/disease experiment should retain:
+
+- parent PWDB dataset identity;
+- canonical subject ID;
+- source artifact/checksum provenance;
+- solver/backend execution identity;
+- numerical scheme/version where relevant;
+- reconstruction qualification state exactly as recorded by the applicable evidence/bundle;
+- warnings/assumptions;
+- VascuQuest version.
+
+## 15. Interaction with v1 analysis
+
+`vascuquest.analysis`, `stats`, `mechanics`, `spectral`, and `plot` operate only after scientific results have been materialized. They do not call the reconstruction solver as an implicit side effect.
+
+Thus an already persisted disease/healthy result can be analyzed repeatedly without repeating healthy reconstruction or network integration.
+
+Downstream results remain provenance-connected to the reconstruction/model inputs. A derived mechanics/spectral/statistical result cannot erase the fact that its disease-state upstream input was `MODELLED`.
+
+## 16. Non-claims
+
+Healthy reconstruction does not establish:
+
+- patient-specific physiological validity;
+- clinical calibration;
+- three-dimensional haemodynamics;
+- measured wall material properties;
+- clinical boundary-condition validity;
+- epidemiological representativeness;
+- longitudinal biological evolution across PWDB ages.
+
+Its purpose is narrower: provide a reproducible independent healthy model state suitable as the parent of the declared mechanistic Virtual Disease interventions.
+
+## 17. Related documentation
+
+- [`VIRTUAL_DISEASE.md`](VIRTUAL_DISEASE.md)
+- [`VIRTUAL_DISEASE_PHYSICS.md`](VIRTUAL_DISEASE_PHYSICS.md)
+- [`VIRTUAL_DISEASE_RUNTIME.md`](VIRTUAL_DISEASE_RUNTIME.md)
+- [`JAX_VIRTUAL_DISEASE_QUALIFICATION.md`](JAX_VIRTUAL_DISEASE_QUALIFICATION.md)
+- [`PARAMETERIZED_COHORT_QUALIFICATION.md`](PARAMETERIZED_COHORT_QUALIFICATION.md)
+- [`TEST_VALIDATION_CONTRACT.md`](TEST_VALIDATION_CONTRACT.md)

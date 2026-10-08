@@ -1,1174 +1,257 @@
-# VascuQuest CLI Contract
+# VascuQuest 1.0 CLI contract
 
-**Status:** Command-line interface contract for implementation  
-**Governing documents:** `DESIGN_CONTRACT.md`, `ARCHITECTURE.md`, `DATA_ENGINEERING.md`, `SCIENTIFIC_MODEL.md`, `API_PLUGIN_CONTRACT.md`  
-**Repository:** `KNOWDYN/VascuQuest`  
-**Canonical v1 dataset:** Zenodo record `3275625`  
-**Purpose:** Freeze the v1 command grammar, output-channel rules, machine-readable behavior, exit-code semantics, destructive-operation safeguards, and Python-API parity required for a reliable research CLI without introducing CLI-only science.
+## 1. Purpose
 
----
+The VascuQuest CLI is a thin Typer interface over the same scientific behavior exposed by the Python API. CLI formatting, file paths, and shell ergonomics must never alter scientific definitions, evidence classes, pairing rules, units, provenance, or validity semantics.
 
-## 1. Objective
+Machine-readable output belongs on stdout. Operational diagnostics and errors belong on stderr. Domain errors retain stable exit-code mapping.
 
-The VascuQuest CLI is a thin command-line adapter over the same application services and scientific API used from Python.
-
-It must support four practical researcher workflows:
-
-1. inspect and prepare the canonical dataset;
-2. query source scientific information;
-3. run registered derivations, research operators, and discovery methods;
-4. export and reproduce results in automation-safe form.
-
-The CLI must remain small enough to learn from `vascuquest --help` and deterministic enough to use safely in shell scripts and reproducible research pipelines.
-
-The CLI must not contain scientific equations, independently parse PWDB source files, or implement calculations unavailable from the Python API.
-
----
-
-## 2. Framework choice
-
-V1 uses **Typer** as the command-line adapter.
-
-This is an implementation choice, not a scientific or public-data dependency. The stable contract is the command grammar and behavior defined here.
-
-Rules:
-
-- Typer may perform argument parsing, help generation, shell completion, and command dispatch;
-- Typer types must be converted into VascuQuest application/domain request objects before scientific execution;
-- no Typer object may leak into the scientific API, plugin protocols, domain layer, or provenance model;
-- replacement of Typer in a future release is permitted if the stable CLI behavior remains compatible.
-
-V1 does not add a second CLI framework or a custom parser abstraction around Typer.
-
----
-
-## 3. Executable and invocation
-
-The installed command is:
+## 2. Global invocation
 
 ```text
-vascuquest
+vascuquest [GLOBAL OPTIONS] COMMAND ...
 ```
 
-The package should also support:
+Global options include:
+
+- `--version` — print package version and exit;
+- `--debug` — include chained diagnostic tracebacks;
+- `--quiet` — suppress nonessential human diagnostics.
+
+For the v1.0 release candidate:
 
 ```text
-python -m vascuquest
-```
-
-when practical, with equivalent command behavior.
-
-Global help and version are:
-
-```text
-vascuquest --help
 vascuquest --version
+1.0.0
 ```
 
-`--version` reports the VascuQuest package version only. Dataset, schema, and plugin versions are reported by the relevant inspection commands.
+## 3. Top-level command surface
 
----
+VascuQuest 1.0 retains the established core command groups/commands and adds first-class research-platform groups.
 
-## 4. Command design rules
+Core surface includes dataset/source inspection, subject selection, quantities, locations, direct value access, waveforms, derivations, models/discovery, plugins, export, and reproduction.
 
-The CLI follows these rules throughout v1.
-
-1. Commands use lowercase kebab-case names.
-2. Scientific identifiers remain canonical machine identifiers; display labels are presentation only.
-3. Dataset identity is explicit whenever ambiguity could exist.
-4. One option has one meaning across commands.
-5. Destructive behavior is never hidden behind a normally read-only command.
-6. Machine-readable output is deterministic and free of progress decoration.
-7. Scientific calculations are delegated to application services/API methods.
-8. Plugin methods are invoked by stable `qualified_id`, not by filesystem path.
-9. A command that may require a multi-gigabyte acquisition must reveal that requirement before acquisition begins.
-10. No command invents scientific defaults that are absent from the registered method/schema.
-
----
-
-## 5. V1 command surface
-
-The approved v1 command tree is intentionally compact.
+First-class v1 research groups are:
 
 ```text
-vascuquest
-├── dataset
-│   ├── info
-│   ├── status
-│   ├── register
-│   ├── acquire
-│   ├── verify
-│   └── clean
-├── subjects
-├── quantities
-├── locations
-├── get
-├── waveform
-├── derive
-├── model
-├── discover
-├── plugins
-│   ├── list
-│   └── describe
-├── export
-└── reproduce
+vascuquest disease ...
+vascuquest hemospace ...
+vascuquest stats ...
+vascuquest mechanics ...
+vascuquest spectral ...
+vascuquest plot ...
 ```
 
-No additional top-level v1 command should be created unless it represents a genuinely distinct application capability that cannot be expressed clearly through this tree.
+The CLI surface is additive relative to the existing core contract.
 
----
+## 4. Core data commands
 
-## 6. Dataset selection
-
-The canonical v1 dataset identifier is:
-
-```text
-pwdb:3275625
-```
-
-Commands that operate on a dataset accept:
-
-```text
---dataset pwdb:3275625
-```
-
-V1 may default to `pwdb:3275625` because it is the only canonical built-in dataset, but the resolved dataset identity must remain visible in structured output and provenance.
-
-A short alias such as `pwdb` may be accepted only if it resolves unambiguously to the canonical record.
-
-No CLI command may silently reinterpret another PWDB release as `3275625`.
-
----
-
-## 7. Global operational options
-
-The following options should be available consistently where applicable:
-
-```text
---dataset <id>
---source <registered-source-name-or-path>
---offline
---format <text|json|jsonl|csv>
---output <path>
---quiet
---debug
-```
-
-Not every command must expose every option.
-
-Semantics:
-
-- `--offline` forbids network acquisition;
-- `--format` selects the CLI presentation/serialization of the primary result only; it never selects a scientific exporter;
-- `--output` writes that primary CLI result to a file instead of standard output when supported;
-- `--quiet` suppresses nonessential human diagnostics, not requested scientific data;
-- `--debug` enables chained diagnostic detail/tracebacks on standard error.
-
-Scientific export uses the separate `export` command and an explicit exporter ID. Scientific method parameters are command-specific and are normalized to the serializable parameter mapping defined in `API_PLUGIN_CONTRACT.md`.
-
----
-
-## 8. Standard output and standard error
-
-The channel contract is strict.
-
-### `stdout`
-
-Standard output contains only the requested primary command result.
-
-Examples:
-
-- human-readable table/text in default text mode;
-- valid JSON object/array in `--format json` mode;
-- valid JSON Lines records in `--format jsonl` mode;
-- CSV data in `--format csv` mode.
-
-### `stderr`
-
-Standard error contains operational information:
-
-- progress;
-- warnings;
-- download notices;
-- acquisition-size notices;
-- confirmation prompts where interactive;
-- recoverable diagnostics;
-- error messages;
-- debug tracebacks when requested.
-
-A progress bar, warning, citation notice, or download message must never corrupt JSON/JSONL/CSV written to `stdout`.
-
----
-
-## 9. Output format rules
-
-### 9.1 Text
-
-`text` is the default for interactive use.
-
-Text output may use terminal-aware formatting but must remain understandable without color.
-
-Color must never encode the only representation of scientific state.
-
-### 9.2 JSON
-
-`json` is the preferred machine-readable representation for one bounded result or metadata object.
-
-It must be valid JSON with stable semantic keys.
-
-Large numeric arrays need not be embedded when doing so would be impractical. In those cases the command must use a supported export representation or explicitly documented external/sidecar array reference.
-
-### 9.3 JSON Lines
-
-`jsonl` is intended for iterable collections such as subjects, quantities, locations, or row-oriented discovery output.
-
-Each line must be an independent valid JSON object.
-
-### 9.4 CSV
-
-`csv` is supported only where the result is naturally tabular and can retain unambiguous column identities/units through headers or companion metadata.
-
-A command must reject `--format csv` when the result cannot be represented faithfully rather than flattening scientific structure ambiguously.
-
-### 9.5 Format support is explicit
-
-Each command documents the formats it supports. Unsupported format/command combinations are usage errors.
-
----
-
-## 10. Structured-output envelope
-
-Machine-readable scientific outputs must preserve the semantics defined by the public result contract.
-
-A JSON scientific result should expose an envelope equivalent to:
-
-```text
-kind
-quantity or result identity
-dataset identity
-evidence class
-unit/dimensional metadata
-subject/cohort/location context
-values or value reference
-coordinates where applicable
-validity/admissibility
-warnings
-provenance
-```
-
-Exact field spelling will be shared with the public serialization implementation and tests; the CLI must not maintain a separate scientific JSON schema.
-
-Metadata-only commands may use simpler schemas.
-
----
-
-## 11. `dataset info`
-
-Purpose: inspect canonical dataset identity and static manifest-level information.
-
-Conceptual usage:
+Core commands continue to expose canonical PWDB data and methods through the shared application services. Typical operations include:
 
 ```text
 vascuquest dataset info
-vascuquest dataset info --format json
-```
-
-It reports at least:
-
-- dataset family;
-- canonical record ID;
-- DOI;
-- schema version;
-- artifact count;
-- canonical artifact inventory summary;
-- canonical-data licence/citation information when available through package metadata.
-
-It must not download the full dataset.
-
----
-
-## 12. `dataset status`
-
-Purpose: report local availability and verification state.
-
-Conceptual usage:
-
-```text
 vascuquest dataset status
-vascuquest dataset status --format json
-```
-
-It reports:
-
-- registered/local source locations in non-sensitive normalized form;
-- canonical artifact states (`missing`, `present_unverified`, `verified`, `checksum_failed`, `unreadable`);
-- available scientific capabilities;
-- missing capability requirements;
-- source/derived/result-store disk use where available.
-
-A status command is read-only and must not initiate large acquisition.
-
----
-
-## 13. `dataset register`
-
-Purpose: register an existing local canonical source directory without copying it.
-
-Conceptual usage:
-
-```text
-vascuquest dataset register /path/to/pwdb
-```
-
-Rules:
-
-- recognized canonical artifacts are discovered by the manifest;
-- canonical use requires checksum verification;
-- partial datasets are valid;
-- source files are never modified;
-- the command reports available/missing capabilities after registration;
-- registration identity is operational metadata and does not redefine canonical dataset identity.
-
-The command fails clearly when no recognized artifact is found.
-
----
-
-## 14. `dataset acquire`
-
-Purpose: explicitly acquire canonical source artifacts or capability bundles.
-
-Conceptual usage:
-
-```text
-vascuquest dataset acquire --artifact <artifact-id>
-vascuquest dataset acquire --capability <capability-id>
-```
-
-Artifact and capability IDs come from the packaged manifest/backend capability registry rather than being hard-coded independently in the CLI. A canonical filename may be accepted as an artifact alias only when the manifest defines it unambiguously.
-
-Before downloading a large artifact or bundle, the command must report:
-
-- artifact/capability requested;
-- artifact filenames;
-- expected total size when known;
-- destination/cache context.
-
-Interactive execution requests confirmation for a large acquisition unless `--yes` is supplied.
-
-Non-interactive execution without a TTY must not hang waiting for confirmation; it fails with a clear instruction to use `--yes` when confirmation is required.
-
-Acquired source artifacts are not considered canonical-ready until checksum verification succeeds.
-
----
-
-## 15. `dataset verify`
-
-Purpose: verify registered/cached source artifacts against the canonical manifest.
-
-Conceptual usage:
-
-```text
+vascuquest dataset register <PATH>
+vascuquest dataset acquire --artifact <ID> --yes
 vascuquest dataset verify
-vascuquest dataset verify --artifact <artifact-id>
-```
 
-The command reports expected/observed state and checksum status.
+vascuquest subjects ...
+vascuquest quantities ...
+vascuquest locations ...
 
-A checksum mismatch is never downgraded to a warning followed by scientific use.
+vascuquest get <QUANTITY> --subject <ID> ...
+vascuquest waveform <SIGNAL> --subject <ID> --location <SITE> ...
+vascuquest derive <METHOD-ID> --subject <ID> --location <SITE> ...
 
-Verification may be I/O-expensive for large files; progress belongs on `stderr`.
-
----
-
-## 16. `dataset clean`
-
-Purpose: remove VascuQuest-managed temporary or derived cache material.
-
-Conceptual usage:
-
-```text
-vascuquest dataset clean --derived
-vascuquest dataset clean --temporary
-```
-
-Rules:
-
-- default cleaning does not delete user research outputs;
-- registered external source files are never deleted;
-- canonical cached source copies require an explicit source-removal option plus confirmation;
-- destructive actions support `--yes` for controlled automation;
-- the command prints a deletion plan before confirmation in interactive mode.
-
-There is no generic `clean --all` shortcut that silently destroys source and results together.
-
----
-
-## 17. `subjects`
-
-Purpose: inspect/select virtual-subject metadata without loading large waveform/path data.
-
-Conceptual usage:
-
-```text
-vascuquest subjects
-vascuquest subjects --where age=55
-vascuquest subjects --where age=55 --where plausibility=<canonical-value>
-vascuquest subjects --format jsonl
-```
-
-`--where` is a repeated exact-match filter over validated canonical subject attributes.
-
-The v1 grammar is exactly:
-
-```text
---where <canonical-field>=<value>
-```
-
-The value is parsed according to the schema-defined field type. Repeating `--where` combines conditions with logical AND.
-
-V1 deliberately does **not** implement range operators, OR expressions, arbitrary predicates, SQL fragments, or a custom query language. More complex cohort construction remains available through the Python API until a real requirement justifies a richer CLI grammar.
-
-Missing-value behavior must follow an explicit application-level policy; exact-match filtering must not silently reinterpret missing values as ordinary values.
-
----
-
-## 18. `quantities`
-
-Purpose: list/describe canonical quantities available in the opened dataset/schema.
-
-Conceptual usage:
-
-```text
-vascuquest quantities
-vascuquest quantities --category haemodynamic_parameter
-vascuquest quantities --format jsonl
-```
-
-Output may include:
-
-- canonical quantity ID;
-- label/description;
-- category;
-- canonical unit;
-- dimensionality;
-- contexts/locations;
-- source availability;
-- known source-semantic notes where material.
-
-The command does not compute all quantities merely to list definitions.
-
----
-
-## 19. `locations`
-
-Purpose: inspect canonical sites, segments, paths, and path positions supported by the backend.
-
-Conceptual usage:
-
-```text
-vascuquest locations --kind site
-vascuquest locations --kind path
-```
-
-Location kinds remain scientifically distinct.
-
-The command must not collapse a measurement site into an arterial segment merely because a mapping exists.
-
----
-
-## 20. `get`
-
-Purpose: retrieve a canonical non-waveform scientific quantity.
-
-Conceptual usage:
-
-```text
-vascuquest get <quantity-id> --subject <id>
-vascuquest get <quantity-id> --where age=55
-vascuquest get <quantity-id> --location <canonical-location-id>
-```
-
-Rules:
-
-- quantity identity is canonical;
-- subject/cohort selection is explicit;
-- location is explicit where scientifically required;
-- missing required capability produces a capability error describing the artifact needed;
-- evidence/provenance are retained in structured output;
-- the CLI does not silently substitute a similarly named quantity.
-
----
-
-## 21. `waveform`
-
-Purpose: retrieve a canonical source or registered waveform result.
-
-Conceptual usage:
-
-```text
-vascuquest waveform pressure --subject <id> --location <site-id>
-```
-
-A waveform request must identify the subject and scientifically required location.
-
-Output retains:
-
-- signal identity;
-- samples/value reference;
-- time/sampling context;
-- unit;
-- location;
-- evidence class;
-- provenance.
-
-Plotting is not a required v1 CLI command. Researchers may export data or use Python visualization. This avoids adding a plotting subsystem before it is required.
-
----
-
-## 22. `derive`
-
-Purpose: execute a registered deterministic derivation.
-
-Conceptual usage:
-
-```text
-vascuquest derive <qualified-id> [selection/input options] --param name=value
-```
-
-Rules:
-
-- the derivation is resolved through the component registry;
-- required inputs are resolved canonically by application services;
-- repeated `--param name=value` values are parsed against the registered parameter specification;
-- unspecified parameters use only registered defaults;
-- unknown parameters fail before execution;
-- method identity/version and normalized parameters enter provenance;
-- the CLI contains no derivation equation.
-
-`--help` for the generic command may show common options; method-specific requirements are available through plugin/component description and validation errors. V1 does not dynamically generate a permanent subcommand for every installed method.
-
----
-
-## 23. `model`
-
-Purpose: execute a registered research operator.
-
-Conceptual usage:
-
-```text
-vascuquest model <qualified-id> [selection/input options] --param name=value
-```
-
-Rules mirror `derive`, with additional operator semantics:
-
-- assumptions and admissibility metadata remain visible;
-- outputs are normally `MODELLED` unless the operator declares and justifies another classification;
-- out-of-domain results are not silently presented as fully validated;
-- operator equations remain owned by the operator implementation, never the CLI.
-
----
-
-## 24. `discover`
-
-Purpose: execute a registered discovery method on an explicit cohort/input space.
-
-Conceptual usage:
-
-```text
-vascuquest discover <qualified-id> --where age=55 --param name=value
-```
-
-Rules:
-
-- cohort definition is preserved;
-- missing-data policy comes from explicit user/method configuration, not CLI defaults hidden from provenance;
-- random seed/state is accepted through registered parameters when supported;
-- exploratory/confirmatory and validation information remain visible where applicable;
-- statistical outputs are not converted into causal human claims by CLI wording.
-
----
-
-## 25. `plugins list`
-
-Purpose: inspect available built-in and installed extension components.
-
-Conceptual usage:
-
-```text
+vascuquest export ...
+vascuquest reproduce ...
 vascuquest plugins list
-vascuquest plugins list --kind operator
-vascuquest plugins list --format jsonl
+vascuquest plugins describe <QUALIFIED-ID>
 ```
 
-It reports at least:
+Unsupported capabilities fail explicitly; they are not silently remapped to another source representation, location, or method.
 
-- kind;
-- qualified ID;
-- implementation version;
-- protocol version;
-- supplying distribution/version where available;
-- load/compatibility state.
+## 5. `disease` group
 
-Listing should avoid importing heavy plugin implementations where package metadata permits.
+The Virtual Disease CLI remains the interface to the qualified mechanistic disease subsystem.
 
----
-
-## 26. `plugins describe`
-
-Purpose: inspect one registered component before execution.
-
-Conceptual usage:
+Principal commands include:
 
 ```text
-vascuquest plugins describe <qualified-id>
+vascuquest disease presets
+vascuquest disease describe <CONDITION>
+vascuquest disease generate <CONDITION> ...
+vascuquest disease cohort ...
 ```
 
-It exposes, where applicable:
+Disease outputs remain `MODELLED`. CLI use does not imply clinical validation.
 
-- component identity/version;
-- required inputs;
-- output definitions;
-- parameter specifications/defaults;
-- assumptions;
-- citations;
-- evidence semantics;
-- admissibility/validation scope;
-- deterministic/random behavior.
+The CLI must preserve the same immutable disease request, subject-selection, physics, solver, quantity-status, and provenance behavior as the Python namespace.
 
-This is the primary CLI mechanism for researchers to understand a method before running it.
+## 6. `hemospace` group
 
----
+HEMOSPACE exposes Virtual Cardiovascular Records, coverage, path physiology, cohorts, and documented operation semantics.
 
-## 27. `export`
-
-Purpose: serialize a saved/portable VascuQuest result through a registered result exporter.
-
-Conceptual usage:
+Representative commands include:
 
 ```text
-vascuquest export <result-file> --exporter <qualified-id> --output <path>
-vascuquest export <result-file> --exporter <qualified-id> --param name=value --output <path>
+vascuquest hemospace explain
+vascuquest hemospace record --subject <ID> --depth scalar
+vascuquest hemospace record --subject <ID> --depth geometry
+vascuquest hemospace record --subject <ID> --depth comprehensive
+vascuquest hemospace coverage --subject <ID>
+vascuquest hemospace path --subject <ID> --path aorta_brain
 ```
 
-Rules:
+Path access is lazy and requires the optional path dependency (`h5py`). The CLI must report the reader qualification status honestly and must not imply a fresh whole-artifact scan.
 
-- `--exporter` selects a registered `ResultExporter` by qualified component ID;
-- exporter options use the same validated `--param name=value` mechanism where options are needed;
-- `--format` is **not** reused to select an exporter or exporter-specific format;
-- export does not alter scientific values;
-- evidence/provenance are retained or written to a companion metadata file when the target cannot hold them;
-- ambiguous lossy export requires explicit user choice or fails;
-- exporter identity/version enters representation metadata/provenance where material.
+## 7. `stats` group
 
-Producing commands may use `--output` to save their own selected CLI serialization directly. That is distinct from invoking a scientific `ResultExporter`.
+`vascuquest stats` operates on **native VascuQuest JSON scientific-result exports**. The CLI does not accept anonymous arrays as canonical research inputs.
 
-V1 does not require a persistent global result database merely to support `export`.
-
----
-
-## 28. `reproduce`
-
-Purpose: execute or validate a saved VascuQuest provenance/workflow specification.
-
-Conceptual usage:
+Implemented commands:
 
 ```text
-vascuquest reproduce <provenance-or-workflow-file>
+vascuquest stats describe <RESULT.json>
+vascuquest stats bootstrap <RESULT.json> [--confidence ...] [--resamples ...] [--seed ...]
+vascuquest stats compare <A.json> <B.json> [--paired] [--method ...]
+vascuquest stats correlate <X.json> <Y.json> [--method pearson|...]
+vascuquest stats partial-correlate <X.json> <Y.json> <CONTROL.json>...
+vascuquest stats regress <RESPONSE.json> <PREDICTOR.json>... [--standardized]
+vascuquest stats robust-regress <RESPONSE.json> <PREDICTOR.json>... [--huber-delta ...]
+vascuquest stats normality <RESULT.json> [--method shapiro|...]
+vascuquest stats variance <A.json> <B.json> [--center median|...]
+vascuquest stats permutation <A.json> <B.json> [--paired] [--resamples ...] [--seed ...]
+vascuquest stats quantiles <RESULT.json>
+vascuquest stats exceedance <RESULT.json> <THRESHOLD> [--inclusive/--no-inclusive]
 ```
 
-Rules:
+### Pairing rule
 
-- required dataset/schema/component identities and versions are checked before execution where possible;
-- strict reproduction does not silently replace unavailable plugin/method versions;
-- missing source artifacts are reported before acquisition and remain subject to normal acquisition policy;
-- a rerun under changed versions is a distinct explicit operation with new provenance;
-- provenance documents are data, not executable Python scripts.
+`--paired` is valid only when the inputs preserve identical canonical subject alignment. The command must not pair values merely because arrays have the same length.
 
----
+### Reproducibility rule
 
-## 29. Selection syntax
+Randomized methods expose explicit seeds. Given the same inputs, method parameters, and seed, results must be reproducible within the method's numerical contract.
 
-The v1 CLI deliberately supports only exact-match filtering:
+### Designed-population rule
+
+`exceedance` and cohort summaries describe the selected virtual design space. They are not clinical risk probabilities or epidemiological prevalence.
+
+## 8. `mechanics` group
+
+Implemented commands:
 
 ```text
---where <canonical-field>=<value>
+vascuquest mechanics list
+vascuquest mechanics compute <METRIC> <AREA.json> [PRESSURE.json] [--blood-density ...]
 ```
 
-Repeated filters are combined with logical AND.
+Canonical v1 metrics listed by the CLI include:
 
-Values are parsed according to schema-defined field types.
+- `area_strain`;
+- `diameter_strain`;
+- `area_compliance`;
+- `area_distensibility`;
+- `pressure_area_slope`;
+- `peterson_modulus`;
+- `beta_stiffness_index`;
+- `bramwell_hill_wave_speed`;
+- `pressure_area_loop_integral`.
 
-No Python `eval`, comparison-expression parser, OR syntax, SQL fragment, or executable predicate is accepted.
+Inputs must be native `Waveform` JSON results. Metrics requiring pressure require aligned pressure and area waveforms for the same subject/location/time basis. No silent interpolation is performed.
 
-Range, compound, matched, weighted, or other advanced cohort logic remains available through the Python API until its real CLI requirements are established.
+The mechanics CLI does not run FSI or the disease solver.
 
-This keeps the CLI predictable across shells and avoids quoting/redirection ambiguity around operators such as `<` and `>`.
+## 9. `spectral` group
 
----
-
-## 30. Method parameter syntax
-
-Registered method parameters use repeated:
+Implemented commands include:
 
 ```text
---param name=value
+vascuquest spectral harmonics <WAVEFORM.json> [--count N] [--phase]
+vascuquest spectral psd <WAVEFORM.json>
+vascuquest spectral csd <X.json> <Y.json> [--phase] [--nperseg ...]
+vascuquest spectral coherence <X.json> <Y.json> [--nperseg ...]
+vascuquest spectral transfer <INPUT.json> <OUTPUT.json> [--phase] [--nperseg ...]
+vascuquest spectral impedance <PRESSURE.json> <FLOW.json> [--harmonics N] [--phase]
+vascuquest spectral characteristic-impedance <PRESSURE.json> <FLOW.json> [--start ...] [--end ...]
+vascuquest spectral wave-separation <PRESSURE.json> <FLOW.json> <ZC> [--backward]
+vascuquest spectral wave-intensity <PRESSURE.json> <VELOCITY.json> <WAVE-SPEED> [--component net|forward|backward] [--density ...]
+vascuquest spectral stft <WAVEFORM.json> [--nperseg ...] [--noverlap ...]
+vascuquest spectral entropy <WAVEFORM.json>
+vascuquest spectral harmonic-energy-ratio <WAVEFORM.json> [--low-end ...] [--high-start ...] [--high-end ...]
+vascuquest spectral reflection-magnitude <PRESSURE.json> <FLOW.json> <ZC>
 ```
 
-The application layer validates the value against the component's `ParameterSpecification`.
+Uniform sampling is enforced where required. Hidden resampling is forbidden.
 
-Rules:
+Local pressure/flow methods require co-location. Cross-site CSD/coherence/transfer may compare different arteries for the same virtual subject only when time coordinates align.
 
-- booleans, integers, floats, strings, enum-like values, and explicitly supported simple lists may be accepted;
-- dimensional values must use the unit conventions defined by the parameter specification;
-- unknown parameters fail;
-- duplicate scalar parameters fail unless the specification explicitly permits repeated/list values;
-- CLI parsing never invents scientific parameter ranges/defaults;
-- normalized parameter values enter provenance exactly as executed.
+## 10. `plot` group
 
-For complex parameter structures, a method may support:
+Implemented convenience commands:
 
 ```text
---params-file <json-file>
+vascuquest plot series <RESULT.json>... --output <FIGURE.svg|pdf|png> [--title ...] [--spec-output <SPEC.json>]
+vascuquest plot scatter <X.json> <Y.json> --output <FIGURE.svg|pdf|png> [--title ...] [--spec-output <SPEC.json>]
 ```
 
-JSON is sufficient for v1; YAML is not required merely for convenience.
+The Python plotting API supports richer compound figures than these convenience commands, including multi-panel layouts and insets.
 
----
+CLI plotting obeys these invariants:
 
-## 31. Interactive versus automated execution
+- no silent cohort thinning/downsampling;
+- rasterization may change rendering cost but not observations;
+- legends remain outside the scientific plotting region;
+- legend bounding boxes must not collide with axes, tick labels, axis labels, titles, insets, or neighboring panels;
+- optional figure-spec output records the declarative recipe.
 
-The CLI must behave predictably in both terminals and pipelines.
+## 11. Native result-file boundary
 
-### Interactive mode
+The v1 research CLI groups use VascuQuest's portable JSON result representation as their file boundary. Loading a result reconstructs scientific metadata and values rather than importing an unlabeled table.
 
-When attached to a TTY, the CLI may:
+This preserves:
 
-- show progress;
-- request confirmation before large downloads/destructive actions;
-- use terminal formatting.
+- quantity identity;
+- subject/cohort identity;
+- location;
+- evidence;
+- dimensions/coordinates;
+- provenance reference;
+- warnings/validity metadata supported by the result format.
 
-### Non-interactive mode
+CSV remains useful for tabular exchange but cannot silently replace the native result contract for methods that depend on full scientific context.
 
-When no TTY is available:
+## 12. Output behavior
 
-- no command waits indefinitely for input;
-- confirmation-requiring actions fail unless `--yes` is explicitly supplied;
-- machine output remains clean;
-- progress may be suppressed or written to `stderr` only.
+Machine-readable commands emit parseable output without decorative prose on stdout.
 
-No scientific result depends on whether execution is interactive.
+Human diagnostics, warnings that are not part of a machine result, and errors belong on stderr where the existing command implementation supports that distinction.
 
----
+Commands writing files must fail rather than silently overwrite or reinterpret scientific content outside their declared behavior.
 
-## 32. Large-download safeguard
+## 13. Stable domain exit codes
 
-For v1, an acquisition requires large-download confirmation when either:
+VascuQuest keeps the centralized exit mapping:
 
-```text
-any planned canonical artifact >= 1 GiB
-```
+- `3` — dataset/capability unavailable;
+- `4` — integrity failure;
+- `5` — schema/unit/selection failure;
+- `6` — admissibility/numerical-method failure;
+- `7` — plugin compatibility/plugin failure;
+- `8` — reproducibility failure;
+- `70` — unexpected/internal software failure.
 
-or
+Click/Typer usage errors retain their normal command-line usage semantics.
 
-```text
-the total planned acquisition >= 1 GiB.
-```
+## 14. API/CLI equivalence
 
-This **1 GiB threshold is an operational safety default**, not a scientific threshold and not part of dataset identity. A future configuration option may lower it, but v1 must never silently raise it above the built-in default.
+For a given method, data, and parameters, CLI and Python behavior must agree scientifically. The CLI may serialize results differently for shell use, but it may not introduce different scientific defaults or bypass identity/alignment checks.
 
-For a large acquisition, the CLI displays the expected size and obtains confirmation in interactive mode unless `--yes` is supplied.
+## 15. Dependency behavior
 
-This rule protects users from accidental multi-gigabyte downloads while leaving capability resolution unchanged.
+Commands requiring optional dependencies must fail explicitly with installation guidance/capability information. They must never silently choose a different method solely because SciPy, PyWavelets, Matplotlib, h5py, or JAX is absent.
 
----
+## 16. Non-claims
 
-## 33. Warnings
-
-Warnings fall into two categories.
-
-### Operational warnings
-
-Examples: cache state, slow verification, optional plugin failure.
-
-These go to `stderr`.
-
-### Scientific warnings
-
-Examples: out-of-domain operator use, limited validation scope, missing-data policy consequences.
-
-These must be retained in `ScientificResult`/provenance and may also be summarized on `stderr` in human mode.
-
-`--quiet` may suppress the duplicate human summary but must not remove scientific warning metadata from the result.
-
----
-
-## 34. Exit codes
-
-V1 uses a small stable exit-code map.
-
-| Code | Meaning |
-|---:|---|
-| `0` | success |
-| `2` | CLI usage/argument/parameter syntax error |
-| `3` | dataset/source/capability unavailable or acquisition failure |
-| `4` | source integrity/checksum failure |
-| `5` | schema/unit/selection/scientific-input validation failure |
-| `6` | scientific admissibility or numerical-method failure |
-| `7` | plugin load/compatibility/identity failure |
-| `8` | reproducibility/version mismatch failure |
-| `70` | unexpected VascuQuest internal software failure |
-
-Rules:
-
-- an expected user/scientific error must not return `70` merely because a low-level library raised an exception;
-- the CLI maps the public exception hierarchy to these codes centrally;
-- plugin-specific exceptions are translated into the closest stable VascuQuest category;
-- signal/keyboard interruption follows normal platform/shell behavior rather than being redefined as a scientific exit code.
-
----
-
-## 35. Error rendering
-
-Default error output must include:
-
-- concise error class/category;
-- actionable message;
-- relevant dataset/component/artifact identity;
-- recovery hint when known.
-
-Default execution must not dump an internal traceback for ordinary expected failures.
-
-`--debug` enables chained traceback/diagnostic context on `stderr`.
-
-Machine-readable error mode may be added if needed, but v1 does not require a second error-serialization framework. Exit code plus `stderr` is sufficient for shell automation; structured success output remains on `stdout`.
-
----
-
-## 36. Progress behavior
-
-Progress reporting is permitted only for operations where it materially helps, such as:
-
-- downloading;
-- checksum verification;
-- archive extraction;
-- long cohort computations.
-
-Rules:
-
-- progress goes to `stderr`;
-- progress is disabled or simplified when not attached to a terminal;
-- progress output never changes scientific computation;
-- the CLI does not estimate scientific confidence from progress indicators.
-
----
-
-## 37. Logging
-
-The CLI is not a substitute for a logging framework visible to ordinary users.
-
-Default output should remain concise.
-
-`--debug` may expose diagnostic logging useful for developers.
-
-The core scientific API must not depend on CLI logging configuration.
-
-No telemetry or remote logging is enabled by default.
-
----
-
-## 38. Shell completion
-
-Shell completion may be provided through Typer's supported mechanisms.
-
-Completion is an ergonomic feature only.
-
-It must not require network access or import every heavy plugin just to complete ordinary static command/option names.
-
-Dynamic completion for plugin/quantity IDs is optional and should be implemented only if it remains fast and side-effect free.
-
----
-
-## 39. Citation visibility
-
-Scientific methods and dataset usage may require citations.
-
-The CLI must make citations discoverable through dataset/component inspection and structured provenance.
-
-It need not print a full bibliography after every command.
-
-This avoids clutter while retaining reproducibility and attribution.
-
----
-
-## 40. Security boundaries
-
-The CLI must never execute arbitrary Python supplied through:
-
-- `--plugin` file paths;
-- selection expressions;
-- parameter expressions;
-- provenance/workflow files.
-
-Plugins come only from installed distributions through the approved entry-point registry.
-
-Workflow/provenance files are declarative data interpreted against registered operations.
-
-Archive and download safety remain governed by `DATA_ENGINEERING.md`.
-
----
-
-## 41. Cross-platform requirements
-
-The CLI must work on supported Windows, macOS, and Linux Python environments.
-
-Rules:
-
-- use `pathlib`/platform-safe path handling internally;
-- do not require POSIX shell tools for core operations;
-- machine-readable output uses explicit UTF-8 handling where file encoding matters;
-- commands must not assume `/tmp`, `/home`, Unix path separators, or shell-specific quoting in core logic;
-- examples may show POSIX-style paths, but tests must cover Windows path semantics where relevant.
-
----
-
-## 42. Scientific-language discipline
-
-CLI wording must preserve the scientific model.
-
-It must use terms such as:
-
-- virtual subject;
-- source quantity;
-- derived result;
-- modelled result;
-- inferred result;
-- measurement site;
-- arterial segment;
-- arterial path/path position;
-- physiological plausibility;
-
-according to their defined meanings.
-
-It must not relabel virtual subjects as patients, call model predictions measurements, or call virtual-population associations human causal effects.
-
-No mathematical equation is defined or reformulated by CLI help text.
-
----
-
-## 43. API/CLI parity matrix
-
-Every scientific CLI operation maps to an existing application/API capability.
-
-| CLI | API/application equivalent |
-|---|---|
-| `dataset info/status` | dataset/session identity/status services |
-| `dataset register` | `register_source(...)` |
-| `dataset acquire/verify/clean` | data-management services |
-| `subjects` | `session.subjects(...)` / selection service |
-| `quantities` | `session.quantities()` |
-| `locations` | location/capability inspection |
-| `get` | `session.get(...)` |
-| `waveform` | `session.waveform(...)` |
-| `derive` | `session.derive(...)` |
-| `model` | `session.model(...)` |
-| `discover` | `session.discover(...)` |
-| `plugins list/describe` | plugin registry introspection |
-| `export` | `session.export(...)` / exporter service |
-| `reproduce` | `session.reproduce(...)` / reproduction service |
-
-A CLI command may not bypass this mapping to gain access to backend internals.
-
----
-
-## 44. Explicit non-goals
-
-V1 CLI will not:
-
-- provide one command per PWDB source file;
-- expose HDF5/MAT/WFDB internal paths as normal scientific arguments;
-- include a built-in SQL shell;
-- include a custom expression language;
-- include arbitrary Python evaluation;
-- auto-install plugins;
-- execute plugin files by path;
-- add a plotting subsystem before required;
-- create dynamic permanent subcommands for every installed scientific method;
-- require interactive prompts for normal read-only science;
-- place progress messages in machine-readable stdout;
-- hide evidence class or scientific warnings in structured results;
-- silently perform full-dataset acquisition;
-- silently choose method versions during reproduction;
-- define or modify scientific equations.
-
----
-
-## 45. Implementation invariants
-
-The following must remain true in code.
-
-1. `vascuquest` is the single installed CLI entry point.
-2. Typer exists only in the CLI/interface layer.
-3. CLI command functions perform parsing/dispatch/rendering, not scientific calculations.
-4. all scientific commands use shared application/API services.
-5. stdout contains only primary requested output.
-6. diagnostics/progress/prompts go to stderr.
-7. JSON/JSONL/CSV output cannot be corrupted by terminal decoration.
-8. dataset identity is canonical and visible in structured results/provenance.
-9. large downloads are never hidden behind lightweight inspection commands.
-10. non-interactive commands never block on an unseen prompt.
-11. destructive actions require explicit intent.
-12. registered external methods are addressed by qualified component ID.
-13. scientific parameters are validated against registered parameter specifications.
-14. CLI parsing does not invent scientific defaults/ranges.
-15. method equations remain outside the CLI.
-16. evidence and validity semantics match Python results.
-17. exit-code mapping is centralized and stable.
-18. debug tracebacks are opt-in.
-19. no arbitrary Python evaluation occurs in filters/params/workflows.
-20. the CLI remains cross-platform without external shell-tool dependencies.
-21. `--format` always means CLI presentation serialization; scientific exporters are selected only by `--exporter` on `export`.
-22. v1 `--where` filtering is exact-match AND filtering only.
-23. acquisition plans at or above 1 GiB require the large-download safeguard.
-
----
-
-## 46. Minimal acceptance scenarios
-
-### A. Fresh installation, metadata inspection
-
-```text
-vascuquest dataset info
-```
-
-Expected: dataset identity/manifest summary; no full dataset download.
-
-### B. Partial local source registration
-
-```text
-vascuquest dataset register /research/pwdb
-vascuquest dataset status
-```
-
-Expected: recognized files verified, partial capabilities reported, no file modification.
-
-### C. Automation-safe subjects output
-
-```text
-vascuquest subjects --where age=55 --format jsonl
-```
-
-Expected: one valid JSON object per line on stdout; warnings/progress absent from stdout.
-
-### D. Missing waveform artifact
-
-```text
-vascuquest waveform pressure --subject <id> --location <site-id> --offline
-```
-
-Expected: explicit capability/source error with required artifact; exit `3`; no hidden network call.
-
-### E. Run operator
-
-```text
-vascuquest model example:operator --subject <id> --param alpha=...
-```
-
-Expected: parameters validated from descriptor, canonical inputs resolved, operator executed through application services, `MODELLED` result/provenance returned; CLI owns no equation.
-
-### F. Incompatible plugin
-
-```text
-vascuquest model incompatible:operator ...
-```
-
-Expected: compatibility error before science; exit `7`.
-
-### G. Machine-readable error isolation
-
-A command using `--format json` encounters a checksum error.
-
-Expected: no malformed partial JSON is mixed with error text; error appears on stderr; exit `4`.
-
-### H. Large acquisition in CI
-
-A non-interactive command plans at least 1 GiB of acquisition and `--yes` is absent.
-
-Expected: fail rather than hang or download silently; report the planned size and instruct use of `--yes`.
-
----
-
-## 47. Audit checklist
-
-`CLI_CONTRACT.md` passes only if every answer is **yes**.
-
-### Simplicity
-
-- Is the top-level command set compact?
-- Is there one CLI framework and no parser abstraction layer?
-- Are complex query languages, SQL shells, plotting subsystems, and dynamic method subcommands avoided?
-
-### Completeness
-
-- Can researchers inspect/acquire/verify data, inspect subjects/quantities/locations, retrieve data, run derivations/operators/discovery, inspect plugins, export, and reproduce?
-- Can partial/offline environments be used explicitly?
-- Are destructive and large-download operations controlled?
-
-### Feasibility
-
-- Can every command be implemented with Typer plus existing application services?
-- Does machine output work in pipes without terminal corruption?
-- Can Windows/macOS/Linux be supported without shell-specific dependencies?
-
-### Scientific integrity
-
-- Are evidence, provenance, units, locations, cohorts, and validity preserved?
-- Does CLI wording maintain virtual-subject/source/model distinctions?
-- Are method parameters driven by registered definitions rather than CLI guesses?
-- Are there no equations in CLI code/help that redefine scientific methods?
-
-### Automation
-
-- Are stdout/stderr roles deterministic?
-- Are exit codes stable and small in number?
-- Can non-interactive execution avoid prompts/hangs?
-- Is structured output deterministic and parseable?
-- Does `--format` retain one meaning across commands?
-
-### Architecture/API compatibility
-
-- Does every scientific command map to shared API/application functionality?
-- Are backend formats/storage hidden?
-- Is Typer isolated to the interface layer?
-- Are plugin methods invoked through the registry rather than imported by path?
-
-If any answer is no, this file must be amended before `TEST_VALIDATION_CONTRACT.md`.
-
----
-
-## 48. Approval consequence
-
-Once this contract passes audit:
-
-- the v1 command grammar is frozen;
-- stdout/stderr and machine-output behavior are frozen;
-- exit-code categories are frozen;
-- exact-match `--where` and method-parameter syntax are frozen at their intentionally small v1 scope;
-- the 1 GiB large-acquisition safeguard is frozen as an operational default;
-- Typer is approved as the v1 adapter without entering scientific layers;
-- exact help prose and cosmetic terminal formatting may evolve without changing semantics;
-- the next contract is `TEST_VALIDATION_CONTRACT.md`.
-
----
-
-## 49. Implementation restraint
-
-The CLI exists to expose the research API, not to become a second application.
-
-During implementation:
-
-- one command function should normally translate CLI arguments into one application request and render one result;
-- shared parsing helpers are acceptable only for truly repeated behavior;
-- no `cli/utils.py` dumping ground should emerge;
-- no command should open PWDB files directly;
-- no feature is added merely because Typer can support it;
-- scientific correctness and automation stability take precedence over decorative terminal behavior.
+CLI availability does not imply that a method is clinically validated. Commands operating on modelled disease results remain analyses of modelled counterfactuals. Commands operating on designed PWDB cohorts do not produce epidemiological risk or prevalence estimates.
