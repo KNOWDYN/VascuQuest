@@ -125,7 +125,9 @@ Path access requires the optional `h5py` dependency:
 pip install 'vascuquest[path]'
 ```
 
-The reader is bounded and refuses a whole-file fallback for a large non-HDF5 MATLAB artifact. The path reader is implemented from the canonical PWDB exporter structure, but multi-gigabyte real-source qualification is intentionally reported explicitly rather than being claimed without the canonical files present during CI.
+The reader is bounded and refuses a whole-file fallback for a large non-HDF5 MATLAB artifact. It is qualified as `QUALIFIED_AUTHORITATIVE_EXPORTER_CONTRACT`: the implementation was checked against the exact revised-submission PWDB exporter, the canonical Zenodo filenames/checksums, MATLAB-v7.3/HDF5 struct/cell reference conventions, and an executed regression fixture covering all four HEMOSPACE path families including the split aorta→foot P/U/A representation. This qualification establishes reader correctness without requiring a fresh multi-gigabyte artifact download or full-population rerun. Canonical artifact identity is still enforced independently by VascuQuest checksums.
+
+See `HEMOSPACE_PATH_QUALIFICATION.md` for the qualification certificate and boundary.
 
 ## 5. Phenotype-driven virtual cohorts
 
@@ -191,7 +193,7 @@ The closure report audits every canonical PWDB artifact and assigns an explicit 
 - on-demand;
 - redundant representation;
 - reconstructed;
-- lazy path access;
+- qualified lazy path access;
 - declared source-format limitation.
 
 Closure also checks scalar-source coverage and requested geometry/common-site-waveform coverage.
@@ -253,4 +255,5 @@ See also:
 - `HEMOSPACE_QUANTITY_CATALOGUE.md`
 - `HEMOSPACE_ENDOVASCULAR_PROTOCOLS.md`
 - `HEMOSPACE_KNOWLEDGE_CLOSURE.md`
+- `HEMOSPACE_PATH_QUALIFICATION.md`
 - `HEMOSPACE_AGENT.md`

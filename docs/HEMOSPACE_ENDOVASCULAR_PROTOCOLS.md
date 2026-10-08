@@ -195,7 +195,7 @@ Potential descriptors:
 - path pressure-pulse amplification;
 - spatial trend of flow/area amplitude.
 
-This protocol requires local real-source qualification of the multi-GB path reader before publication-quality use.
+The path reader is qualified under `QUALIFIED_AUTHORITATIVE_EXPORTER_CONTRACT`. Publication-quality use should retain the canonical PWDB DOI and artifact checksum as ordinary provenance, but no separate multi-gigabyte reader-qualification run is required. See `HEMOSPACE_PATH_QUALIFICATION.md`.
 
 ## Protocol 8 — Reproducible subgroup/effect-modifier analysis
 

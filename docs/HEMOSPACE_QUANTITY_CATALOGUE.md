@@ -222,7 +222,7 @@ Where canonical path artifacts are available:
 - onset-distance regression R²;
 - terminal/root pressure-pulse amplification.
 
-The path reader carries an explicit real-source qualification flag because the multi-GB canonical path artifacts are not exercised in normal CI.
+The path reader is qualified as `QUALIFIED_AUTHORITATIVE_EXPORTER_CONTRACT`. Its decoding contract was checked against the exact PWDB revised-submission exporter, the canonical Zenodo artifact identities/checksums, MATLAB-v7.3/HDF5 struct/cell reference conventions, and an executed regression fixture covering combined path files and the split aorta→foot P/U/A representation. This qualifies the reader without implying a fresh full-artifact scan. See `HEMOSPACE_PATH_QUALIFICATION.md`.
 
 ## Disease-response quantities
 
