@@ -13,6 +13,8 @@ clinical validation = false
 population epidemiological representativeness = false
 ```
 
+The reconstruction-gate label above is retained because it is part of the frozen cohort qualification lineage. It must not be interpreted as saying that the VascuQuest 1.0 platform or parameterized cohort implementation is unfinished. See `VIRTUAL_DISEASE_RECONSTRUCTION.md` and `PARAMETERIZED_COHORT_QUALIFICATION.md` for the exact qualification boundary.
+
 ## Cohort contract
 
 `vdc1` adds three population-level controls around the existing vd1 disease models:
@@ -179,6 +181,8 @@ PWDB-VD:<cohort-run-id> / subject 431
 
 `assignments.json`, `assignments.csv`, each subject manifest and all scientific results retain the canonical subject number.
 
+This identity preservation is what allows healthy/disease pairing in HEMOSPACE and `vascuquest.stats`. Equal vector length or row position is never sufficient evidence of pairing.
+
 ## Full 116-segment solution preservation
 
 The existing solver computes the complete network. The cohort bundle preserves the **final converged cardiac cycle** for all 116 segments for every completed subject.
@@ -232,3 +236,74 @@ The engine guarantees that each accepted virtual subject:
 - is persisted with deterministic assignment and solver provenance.
 
 It does **not** claim that the frequency of ages or severities reproduces the prevalence or joint distribution of disease in living human populations. Such epidemiological weighting would require an explicitly sourced and separately versioned external population model.
+
+## VascuQuest 1.0 downstream analysis
+
+Once a complete verified cohort bundle exists, repeated research analysis should consume the persisted results rather than rerun the solver.
+
+Canonical downstream workflow:
+
+```text
+verified cohort bundle
+        ↓
+HEMOSPACE response and/or native ScientificResult loading
+        ↓
+vascuquest.analysis identity/alignment checks
+        ↓
+vascuquest.mechanics / vascuquest.spectral as required
+        ↓
+subject-level derived cohort endpoints
+        ↓
+vascuquest.stats
+        ↓
+vascuquest.plot
+```
+
+Research rules:
+
+- healthy/disease comparisons use canonical subject IDs and paired designs;
+- mechanics/spectral quantities are computed per subject before assembling cohort vectors;
+- time samples or spectral bins from one subject are not independent cohort observations;
+- empirical severity/response frequencies remain properties of the designed virtual experiment;
+- plotting may rasterize large layers but may not silently discard subjects;
+- statistical annotations must be produced by explicit statistical results, not hidden plotting logic.
+
+## Example: phenotype × severity response study
+
+A parameterized cohort can support a model such as:
+
+```text
+response ~ disease_severity + baseline_stiffness + baseline_diameter + age + interactions
+```
+
+provided all predictors/endpoints are aligned by canonical subject ID and the interpretation remains within the designed modelled population.
+
+A statistically significant severity or phenotype coefficient is not clinical efficacy, prognosis or population risk.
+
+## Reproducibility package
+
+A reusable cohort analysis should retain:
+
+- cohort request and plan JSON;
+- `plan_id` / run identity;
+- exact subject IDs and assigned severities;
+- disease backend/execution identity;
+- bundle integrity/checksum records;
+- native scientific-result JSON files;
+- analysis/mechanics/spectral method IDs and parameters;
+- statistical method parameters and random seeds;
+- figure-spec JSON and rendered figures;
+- VascuQuest version;
+- explicit model/population interpretation.
+
+## Related documentation
+
+- [`PARAMETERIZED_COHORT_QUALIFICATION.md`](PARAMETERIZED_COHORT_QUALIFICATION.md)
+- [`VIRTUAL_DISEASE.md`](VIRTUAL_DISEASE.md)
+- [`VIRTUAL_DISEASE_RUNTIME.md`](VIRTUAL_DISEASE_RUNTIME.md)
+- [`HEMOSPACE.md`](HEMOSPACE.md)
+- [`ANALYSIS.md`](ANALYSIS.md)
+- [`STATS.md`](STATS.md)
+- [`VASCULAR_MECHANICS.md`](VASCULAR_MECHANICS.md)
+- [`SPECTRAL_ANALYSIS.md`](SPECTRAL_ANALYSIS.md)
+- [`PLOTTING.md`](PLOTTING.md)

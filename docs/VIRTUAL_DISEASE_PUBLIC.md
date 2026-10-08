@@ -1,28 +1,45 @@
 # Virtual Disease public interface
 
-## Status
+## 1. Status and scientific boundary
 
-This document describes implementation stage **5 of 5** for VascuQuest Virtual Disease v1.
+Virtual Disease is a complete first-party VascuQuest 1.0 subsystem spanning disease request semantics, deterministic source-subject selection, healthy reconstruction, causal vascular transformation, disease-aware network solving, runtime population materialization, portable bundles, parameterized cohorts, Python access, and CLI access.
 
-The implementation chain is now complete from frozen disease request through causal transformation, disease-aware cardiovascular solving, runtime population materialisation, public Python access, command-line generation, and explicit portable export.
-
-The scientific qualification boundary is unchanged:
+The scientific boundary remains:
 
 ```text
 EvidenceClass = MODELLED
-healthy reconstruction gate = METRICS_ONLY_THRESHOLDS_NOT_FROZEN
 clinical validation = false
+population epidemiological representativeness = false
 ```
 
-A generated Virtual Disease subject is a counterfactual model state, not a clinical patient observation or diagnosis.
+A generated Virtual Disease subject is a counterfactual model state, not a clinical observation, diagnosis, prognosis, or validated patient digital twin.
 
-## Public Python API
-
-Virtual Disease is available through the first-party namespace:
+## 2. Public Python namespace
 
 ```python
 import vascuquest as vq
 
+vq.disease
+```
+
+The public namespace exposes:
+
+- frozen disease catalogue/specification helpers;
+- `generate_population(...)`;
+- deterministic selection contracts;
+- runtime disease population/dataset abstractions;
+- portable runtime bundle export;
+- parameterized cohort request/planning/generation;
+- cohort plan read/write;
+- cohort bundle inspect/verify helpers.
+
+The public surface does not imply clinical validation.
+
+## 3. Generate a disease population
+
+Example:
+
+```python
 population = vq.disease.generate_population(
     patients=5,
     age_group=50,
@@ -30,7 +47,7 @@ population = vq.disease.generate_population(
     parameters={
         "side": "left",
         "artery": "common_carotid",
-        "nascet_stenosis": 0.6,
+        "nascet_stenosis": 0.60,
         "lesion_length_m": 0.02,
     },
     seed=17,
@@ -39,29 +56,64 @@ population = vq.disease.generate_population(
 )
 ```
 
-Selected subjects retain their canonical PWDB subject numbers while belonging to a separate content-addressed `PWDB-VD` dataset identity.
+Selected subjects retain canonical PWDB subject numbers while belonging to a separate content-addressed `PWDB-VD` dataset identity.
 
-The source PWDB subject and runtime disease subject therefore remain directly pairable:
+Example pairing:
 
 ```text
-PWDB:3275625 / subject 431
-PWDB-VD:<run-id> / subject 431
+healthy: PWDB:3275625 / subject 431
+disease: PWDB-VD:<run-id> / subject 431
 ```
 
 The canonical PWDB source artifacts are never modified.
 
-## Public CLI
+## 4. Frozen presets
 
-The command group is:
+The public catalogue exposes exactly four v1 conditions:
+
+```text
+carotid_stenosis
+iliac_stenosis
+fusiform_abdominal_aortic_aneurysm
+large_artery_stiffening
+```
+
+Use:
+
+```python
+vq.disease.presets()
+vq.disease.preset(...)
+vq.disease.specification(...)
+```
+
+or the CLI:
+
+```text
+vascuquest disease presets
+vascuquest disease describe <CONDITION>
+```
+
+Descriptions include parameter names/bounds, assumptions, mechanistic scope, evidence boundary, and citations where implemented.
+
+## 5. Public CLI tree
+
+The current command group is:
 
 ```text
 vascuquest disease
 ├── presets
 ├── describe
-└── generate
+├── generate
+└── cohort
+    ├── plan
+    ├── generate
+    ├── inspect
+    └── verify
 ```
 
-### Inspect the frozen presets
+This is the current v1 public surface; the cohort commands are not future work.
+
+## 6. Inspect the frozen presets
 
 ```bash
 vascuquest disease presets --format json
@@ -73,13 +125,13 @@ Inspect one preset:
 vascuquest disease describe carotid_stenosis --format json
 ```
 
-The description reports parameter names, simple request bounds, assumptions, mechanistic implementation scope, citations, `MODELLED` evidence, and the absence of clinical validation.
+The CLI reports `MODELLED` scientific status and the absence of clinical validation.
 
-### Generate a population
+## 7. Generate a population from CLI
 
-Carotid stenosis example:
+Representative carotid-stenosis workflow:
 
-```bash
+```text
 vascuquest disease generate carotid_stenosis \
   --patients 5 \
   --age 50 \
@@ -89,170 +141,201 @@ vascuquest disease generate carotid_stenosis \
   --param lesion_length_m=0.02 \
   --seed 17 \
   --source /path/to/pwdb \
-  --offline \
-  --format json
-```
-
-Iliac stenosis example:
-
-```bash
-vascuquest disease generate iliac_stenosis \
-  --patients 5 \
-  --age 50 \
-  --param side=right \
-  --param artery=external_iliac \
-  --param diameter_stenosis=0.55 \
-  --param lesion_length_m=0.03 \
-  --seed 17 \
-  --source /path/to/pwdb \
   --offline
 ```
 
-Fusiform AAA example:
+Exact options are available through command help. The CLI uses the same disease specification and runtime generation path as the Python API.
 
-```bash
-vascuquest disease generate fusiform_abdominal_aortic_aneurysm \
-  --patients 5 \
-  --age 60 \
-  --param maximum_diameter_m=0.03 \
-  --param aneurysm_length_m=0.10 \
-  --seed 17 \
-  --source /path/to/pwdb \
-  --offline
-```
+## 8. Solver backend selection
 
-Large-artery stiffening example:
+The NumPy backend is the frozen/reference default for Virtual Disease execution.
 
-```bash
-vascuquest disease generate large_artery_stiffening \
-  --patients 5 \
-  --age 60 \
-  --param target_cfpwv_m_per_s=12.0 \
-  --seed 17 \
-  --source /path/to/pwdb \
-  --offline
-```
+Where the public command/API permits it, the optional JAX backend can be selected explicitly. Backend selection is part of execution identity and does not change the underlying disease condition/specification.
 
-Subject-specific admissibility remains enforced by the disease physics layer. For example, a requested lesion must fit inside its eligible anatomy, a fusiform AAA must actually dilate the covered healthy aorta, and the stiffening target cannot be below a selected subject's baseline model-space cfPWV.
+JAX availability requires the optional `jax` installation extra.
 
-## Generation result
+## 9. Quantity availability
 
-The primary command result reports:
+The runtime dataset explicitly declares the disease-state status of public quantities.
 
-- exact `PWDB-VD` dataset identity and run ID;
-- exact parent PWDB identity;
-- frozen disease condition and normalized parameters;
-- requested patient count, age group and deterministic seed;
-- preserved canonical PWDB subject IDs;
-- quantity-status mapping;
-- materialised quantities and measurement sites;
-- result count per subject;
-- final solver diagnostics per subject;
-- explicitly unsupported disease-state quantities;
-- `MODELLED` evidence;
-- current healthy-reconstruction gate;
-- clinical-validation status;
-- whether the population exists only in process memory or was explicitly exported.
-
-Operational/scientific warnings go to `stderr`, so `--format json` remains valid machine-readable JSON on `stdout`.
-
-## Source acquisition safety
-
-Runtime generation requires the canonical artifacts needed for:
+Examples:
 
 ```text
-model configurations
-subject vascular geometry
-common-site waveforms / aortic inflow reconstruction
+pressure                RECOMPUTED
+flow_velocity           RECOMPUTED
+luminal_area             RECOMPUTED
+flow_rate                DERIVED_FROM_RECOMPUTED
+photoplethysmogram       NOT_SUPPORTED
+age                      UNCHANGED_CAUSAL_INPUT
+heart_rate               UNCHANGED_CAUSAL_INPUT
+stroke_volume            UNCHANGED_CAUSAL_INPUT
+cardiac_output           RECOMPUTED
+brachial_systolic_pressure DERIVED_FROM_RECOMPUTED
+aortic_pulse_wave_velocity NOT_SUPPORTED
+aortic_augmentation_index  NOT_SUPPORTED
+pressure_onset_time        NOT_SUPPORTED
+vascular_geometry          MODEL_PARAMETER_MODIFIED
 ```
 
-The CLI checks their local availability before simulation.
+Unsupported disease-state quantities do not silently fall back to healthy source values.
 
-With `--offline`, missing required artifacts fail explicitly.
+## 10. Runtime bundle export
 
-Without `--offline`, any required acquisition is announced before generation. Existing VascuQuest large/unknown-size confirmation rules apply; non-interactive execution requires `--yes` when confirmation is required.
+The public namespace includes:
 
-## Explicit portable bundle export
-
-Runtime populations are intentionally in-memory unless the user explicitly requests persistence.
-
-To save one generated population:
-
-```bash
-vascuquest disease generate carotid_stenosis \
-  --patients 5 \
-  --age 50 \
-  --param side=left \
-  --param artery=common_carotid \
-  --param nascet_stenosis=0.60 \
-  --param lesion_length_m=0.02 \
-  --seed 17 \
-  --source /path/to/pwdb \
-  --offline \
-  --bundle ./vd-carotid-run
+```python
+vq.disease.write_runtime_bundle(...)
 ```
 
-Existing destinations are never overwritten implicitly. Replacement requires:
+Portable bundles retain the generated scientific results and the identity/provenance/checksum/status context required for downstream audit/reuse.
+
+Use persisted bundles when repeated downstream analysis is needed; statistics, mechanics, spectral analysis, plotting, and HEMOSPACE response calculations should not rerun the disease solver merely to reproduce already persisted model outputs.
+
+## 11. Parameterized cohorts
+
+Parameterized disease cohorts define heterogeneous designed counterfactual populations across source-age and severity intervals while retaining the four frozen disease models.
+
+### Python
+
+Representative public functions include:
+
+```python
+plan = vq.disease.create_parameterized_cohort_plan(...)
+path = vq.disease.generate_parameterized_cohort(...)
+summary = vq.disease.inspect_parameterized_cohort_bundle(path)
+verification = vq.disease.verify_parameterized_cohort_bundle(path)
+```
+
+Plans can also be persisted/reloaded with the public plan read/write helpers.
+
+### CLI plan
 
 ```text
---overwrite
+vascuquest disease cohort plan <CONDITION> \
+  --patients <N> \
+  --age-min <AGE> \
+  --age-max <AGE> \
+  --severity-min <VALUE> \
+  --severity-max <VALUE> \
+  --plan cohort-plan.json \
+  ...
 ```
 
-The bundle contains:
+Planning freezes source-supported subjects and subject-specific executable severities **without solving the population**.
+
+### CLI generate
 
 ```text
-manifest.json
-results/<subject-id>/*.json
-provenance/*.json
+vascuquest disease cohort generate \
+  --plan cohort-plan.json \
+  --bundle cohort-run \
+  --solver-backend numpy \
+  ...
 ```
 
-`manifest.json` records:
+Generation executes the frozen plan through the complete disease solver and persists the cohort bundle. Resume behavior is available through the documented CLI option.
 
-- runtime and parent dataset identities;
-- disease request and run ID;
-- subject IDs;
+### CLI inspect/verify
+
+```text
+vascuquest disease cohort inspect cohort-run
+vascuquest disease cohort verify cohort-run
+```
+
+Verification checks plan identity, subject completeness, and bundle SHA-256 integrity.
+
+## 12. Cohort scientific interpretation
+
+A parameterized cohort is explicitly:
+
+```text
+designed_counterfactual_not_epidemiological
+```
+
+Age filtering uses source PWDB ages only. New ages are not interpolated.
+
+Subject-specific disease-transform admissibility is respected. Invalid severity/subject combinations are rejected explicitly rather than silently repaired or clamped.
+
+See [`VIRTUAL_DISEASE_COHORTS.md`](VIRTUAL_DISEASE_COHORTS.md).
+
+## 13. HEMOSPACE response analysis
+
+A complete parameterized disease bundle can be consumed by HEMOSPACE:
+
+```python
+response = hs.response("./cohort-run", "2104")
+```
+
+or through the corresponding HEMOSPACE CLI.
+
+The response layer verifies persisted scientific-result identity/checksums and reports healthy baseline, modelled disease value, and change without rerunning the solver.
+
+Interpretation:
+
+```text
+paired_counterfactual_model_response_not_clinical_treatment_effect
+```
+
+## 14. VascuQuest 1.0 analysis stack
+
+Runtime disease results can be consumed by the new v1 research layers:
+
+```python
+vq.stats
+vq.mechanics
+vq.spectral
+vq.plot
+```
+
+These namespaces analyze existing `ScientificResult`/`Waveform` objects. They do not mutate Virtual Disease physics or invoke a new solver run implicitly.
+
+## 15. Errors and admissibility
+
+Public APIs/commands fail explicitly for invalid requests, unavailable source data, anatomically inadmissible disease parameters, integrity failures, unsupported quantities, or missing optional capabilities.
+
+The system must not:
+
+- clamp an invalid disease request silently;
+- swap arteries;
+- substitute healthy output for unsupported disease output;
+- infer clinical meaning from a model parameter;
+- continue after bundle/checksum inconsistency as if the result were valid.
+
+## 16. Reproducibility
+
+A reusable disease experiment should retain:
+
+- parent dataset identity;
+- condition and complete parameters;
+- selected canonical subject IDs;
+- seed/planning identity;
+- run or cohort-plan identity;
+- solver backend/execution identity;
 - quantity statuses;
-- materialised quantities and sites;
-- result/provenance counts;
-- current qualification state and warnings;
-- every exported file path and SHA-256 checksum.
+- result provenance/warnings;
+- bundle checksums;
+- VascuQuest version.
 
-Each result file uses the existing portable VascuQuest JSON scientific-result format. Each provenance file contains the full deterministic provenance record corresponding to the materialised result.
+## 17. Non-claims
 
-The bundle references canonical PWDB source artifacts through provenance identities/checksums; it does not copy or relicense the upstream PWDB data.
+The public interface does not claim:
 
-## Materialised v1 state
+- patient-specific clinical prediction;
+- diagnosis/prognosis;
+- treatment/device efficacy;
+- epidemiological disease prevalence;
+- clinical cfPWV equivalence;
+- plaque/ILT/thrombosis/rupture modeling;
+- three-dimensional CFD or FSI;
+- support for disease-state quantities marked `NOT_SUPPORTED`.
 
-For every selected subject, runtime generation materialises:
+## 18. Related documentation
 
-- pressure `P` at all 13 canonical common sites;
-- flow velocity `U` at all 13 canonical common sites;
-- luminal area `A` at all 13 canonical common sites;
-- volumetric flow `Q` at all 13 canonical common sites;
-- age;
-- heart rate;
-- stroke volume;
-- cardiac output;
-- brachial systolic pressure;
-- resolved disease-state vascular geometry/wall-mechanical model state.
-
-The generated waveforms are sampled onto the corresponding parent PWDB cardiac-cycle time coordinate after the adaptive disease solve, enabling direct healthy-versus-disease vector comparison.
-
-## Explicitly unsupported v1 state
-
-The following are not silently copied from the healthy parent:
-
-- photoplethysmogram;
-- aortic pulse-wave velocity as a public disease-state result;
-- aortic augmentation index;
-- pressure-onset time.
-
-Their runtime status is `NOT_SUPPORTED` until a disease-state method exists that can regenerate them consistently.
-
-## Scientific scope
-
-The four frozen v1 presets are mechanistic cardiovascular model interventions. They are useful for controlled counterfactual in-silico research with known intervention ground truth.
-
-They do not claim to reproduce the complete biological state of real patients. In particular, the current implementation does not add closed-loop autonomic/baroreflex adaptation, patient-specific plaque morphology, three-dimensional separated flow, thrombus/remodelling, clinical tonometry, ultrasound physics, diagnostic interpretation, or clinical outcome prediction unless a later explicit model adds and qualifies those capabilities.
-
-The public interface therefore preserves the same principle as the underlying implementation: disease generation is scientifically explicit, provenance-aware, deterministic, and visibly `MODELLED`.
+- [`VIRTUAL_DISEASE.md`](VIRTUAL_DISEASE.md)
+- [`VIRTUAL_DISEASE_RECONSTRUCTION.md`](VIRTUAL_DISEASE_RECONSTRUCTION.md)
+- [`VIRTUAL_DISEASE_PHYSICS.md`](VIRTUAL_DISEASE_PHYSICS.md)
+- [`VIRTUAL_DISEASE_RUNTIME.md`](VIRTUAL_DISEASE_RUNTIME.md)
+- [`VIRTUAL_DISEASE_COHORTS.md`](VIRTUAL_DISEASE_COHORTS.md)
+- [`PARAMETERIZED_COHORT_QUALIFICATION.md`](PARAMETERIZED_COHORT_QUALIFICATION.md)
+- [`HEMOSPACE.md`](HEMOSPACE.md)
+- [`V1_RESEARCH_PLATFORM.md`](V1_RESEARCH_PLATFORM.md)

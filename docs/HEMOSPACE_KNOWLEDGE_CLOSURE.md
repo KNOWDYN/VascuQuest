@@ -48,7 +48,7 @@ At geometry/comprehensive depth the complete canonical subject-specific vascular
 
 ## Derivation closure
 
-The machine agent contract and closure report enumerate the registered scalar and waveform derivations. Any future derived quantity must declare:
+The machine agent contract and closure report enumerate the registered HEMOSPACE scalar and waveform derivations. Any future HEMOSPACE-derived quantity must declare:
 
 - canonical ID;
 - evidence class;
@@ -58,6 +58,8 @@ The machine agent contract and closure report enumerate the registered scalar an
 - assumptions/validity boundary.
 
 Arbitrary feature generation is not part of HEMOSPACE closure.
+
+VascuQuest 1.0 also contains downstream research layers (`mechanics`, `spectral`, `stats`, `plot`). Their outputs are not additional PWDB source fields and are not required merely to call a HEMOSPACE record comprehensive. They consume information already exposed by the scientific object model under their own method contracts.
 
 ## Unified MAT limitation
 
@@ -107,6 +109,8 @@ Knowledge closure also requires stating what cannot be identified from PWDB alon
 
 The absence of these variables is not a missing-data problem to be filled by an AI agent. They were not encoded in the virtual population.
 
+No downstream mechanics, spectral, statistical or plotting method can promote these categories into PWDB knowledge. An external dataset/model may introduce new information only under its own explicit identity/provenance contract.
+
 ## Modelled pathology boundary
 
 Virtual Disease outputs extend a HEMOSPACE record with explicitly `MODELLED` counterfactual information. They do not reveal pre-existing hidden pathology in the original healthy PWDB subject.
@@ -123,6 +127,17 @@ HEMOSPACE response mode consumes persisted disease outputs and preserves:
 
 No solver is rerun for response analysis.
 
+Downstream `mechanics` or `spectral` descriptors calculated from these modelled waveforms remain derived descriptors of modelled counterfactual data. Statistical analysis of them does not convert them into clinical observations.
+
+## Closure versus research completeness
+
+HEMOSPACE knowledge closure and research-workflow completeness are different concepts.
+
+- **HEMOSPACE closure** asks whether supported PWDB information sources and HEMOSPACE-native derivations have an explicit disposition.
+- **Research completeness** asks whether a specific study has performed all analyses, diagnostics, statistics and figures required by its protocol.
+
+A HEMOSPACE record can be closed even when a study has not yet run spectral analysis or statistics. Conversely, running many analytics does not close a record whose source coverage remains unresolved.
+
 ## Closure command
 
 ```bash
@@ -132,3 +147,11 @@ vascuquest hemospace closure \
 ```
 
 Agents and humans should run this command before stating that a HEMOSPACE record is comprehensive.
+
+See also:
+
+- `HEMOSPACE.md`
+- `HEMOSPACE_AGENT.md`
+- `HEMOSPACE_PATH_QUALIFICATION.md`
+- `ANALYSIS.md`
+- `V1_RESEARCH_PLATFORM.md`

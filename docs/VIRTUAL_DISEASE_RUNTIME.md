@@ -1,322 +1,267 @@
 # Virtual Disease runtime populations
 
-## PR 4 status
+## 1. Purpose
 
-This document describes implementation stage 4 of 5 for the first-party VascuQuest Virtual Disease subsystem.
+The Virtual Disease runtime layer materializes completed causal disease models into in-memory VascuQuest scientific results and separate virtual-population datasets.
 
-PR 4 materialises the causal disease models introduced by PR 3 into **in-memory VascuQuest scientific results and virtual-population datasets**. It does not add the public disease-generation CLI; that remains the final PR-5 stage.
+This is a current VascuQuest 1.0 capability. Runtime disease datasets, public generation, portable bundles, and parameterized cohorts are implemented; they are not future stages.
 
-The scientific qualification boundary is unchanged. Healthy reconstruction remains `METRICS_ONLY_THRESHOLDS_NOT_FROZEN`, and every disease-state result is `MODELLED` evidence rather than an observation or a validated clinical patient record.
+The scientific boundary remains explicit:
 
-## Runtime pipeline
+```text
+EvidenceClass = MODELLED
+clinical validation = false
+```
 
-A runtime population generation executes the following sequence:
+A runtime Virtual Disease subject is a counterfactual model state, not a patient observation or diagnosis.
+
+## 2. Runtime pipeline
 
 ```text
 canonical PWDB DatasetSession
-        |
-        | deterministic age-group selection
-        v
-preserved PWDB subject IDs
-        |
-        | assemble immutable healthy parent state
-        v
+        ↓
+deterministic age/source-subject selection
+        ↓
+immutable healthy parent reconstruction
+        ↓
 DiseasePhysicsModel
-        |
-        | execute DiseaseOneDSolver to periodic convergence
-        v
-complete modelled final cardiac cycle
-        |
-        | materialise supported quantities
-        v
+        ↓
+DiseaseOneDSolver / qualified backend execution
+        ↓
+modelled final cardiac cycle
+        ↓
+materialize supported quantities and geometry state
+        ↓
 PWDB-VD:<content-addressed-run-id>
 ```
 
 The canonical PWDB source dataset is never modified.
 
-## Dataset and subject identity
+## 3. Dataset identity
 
 Each generated population receives a new exact dataset identity:
 
 ```text
-dataset_family       = PWDB-VD
-record_id            = <DiseaseRunIdentity.run_id>
+dataset_family        = PWDB-VD
+record_id             = <DiseaseRunIdentity.run_id>
 persistent_identifier = urn:vascuquest:virtual-disease:<run-id>
-schema_version       = parent PWDB schema version
+schema_version        = parent PWDB schema version
 ```
 
-The `record_id` is therefore the SHA-256 content address already frozen by PR 1 from:
+The runtime dataset constructor uses the frozen run identity rather than inventing an unrelated identifier.
 
-- exact parent PWDB dataset identity;
-- selected canonical subject IDs;
-- patient count;
-- age group;
-- selection seed;
-- disease condition;
-- disease parameters;
-- preset/contract version.
+The content-addressed run identity incorporates the scientific request context, including the parent dataset identity, selected canonical subject IDs, requested population design, disease condition/parameters, and contract/version information.
 
-The runtime dataset constructor mechanically rejects an identity that is not derived from its `DiseaseRunIdentity`.
+## 4. Preserved canonical subject numbers
 
-### Preserved patient numbers
-
-The selected PWDB subject number is retained exactly:
+The source PWDB subject number is retained exactly inside the disease dataset:
 
 ```text
-healthy baseline: PWDB:3275625 / subject 431
-runtime disease:  PWDB-VD:<run-id> / subject 431
+healthy: PWDB:3275625 / subject 431
+disease: PWDB-VD:<run-id> / subject 431
 ```
 
-The two `SubjectKey` values are not identical because they belong to different dataset identities, but their `canonical_subject_id` is deliberately identical. This enables direct matched healthy-versus-diseased comparison without modifying or duplicating the source PWDB identity.
+The `SubjectKey` objects differ because their dataset identities differ, but the shared canonical subject ID enables explicit matched healthy-versus-disease analysis.
 
-## Runtime-only storage
+Downstream pairing must use the canonical ID relationship deliberately; it must not pretend the healthy and disease `SubjectKey` objects are the same object.
 
-`RuntimeDiseaseStore` is an in-process content-addressed store. It does not write into:
+## 5. Runtime scientific results
 
-- the PWDB artifacts;
-- VascuQuest's canonical source registration;
-- a persistent database;
-- an implicit disk cache.
+Runtime results use the existing VascuQuest scientific result model and preserve:
 
-A repeated request with the same content-addressed run ID returns the already generated runtime dataset held by that store. A scientifically different request produces a different run ID and therefore a different runtime dataset identity.
+- disease dataset identity;
+- canonical scientific quantity identity;
+- canonical subject ID;
+- vascular location;
+- modelled values;
+- method/backend execution context;
+- provenance reference;
+- warnings and quantity status.
 
-PR 5 may expose explicit user-facing save/export behaviour, but PR 4 does not silently persist generated populations.
+Disease-qualified storage/vector labels do not replace the canonical quantity name. For example, a disease pressure vector remains scientifically `pressure` while the runtime label can encode the disease condition.
 
-## VascuQuest data structures
+## 6. Common-site waveform materialization
 
-Runtime disease data uses the established VascuQuest domain objects:
+The runtime population materializes supported modelled haemodynamic quantities at the 13 canonical common measurement sites.
 
-- `DatasetIdentity`;
-- `SubjectKey`;
-- `VirtualSubject`;
-- `Cohort`;
-- `QuantityDefinition`;
-- `ScientificResult`;
-- `Waveform`;
-- `Coordinate`;
-- `ProvenanceRecord`.
-
-`RuntimeDiseaseDataset` provides a read facade aligned with familiar dataset operations:
-
-- `subjects()` / `subject()`;
-- `quantities()`;
-- `locations()`;
-- `get()` for supported scalar/structured quantities;
-- `waveform()` for modelled `P/U/A/Q`;
-- `geometry()` for the runtime vascular state;
-- `provenance()`;
-- `quantity_status()` / `quantity_statuses()`.
-
-It is intentionally not installed into the canonical PWDB backend and does not redefine the established `DatasetSession` contract.
-
-## Materialised disease-state quantities
-
-For each selected subject, PR 4 materialises 58 concrete results:
-
-- `P`, `U`, `A`, and `Q` at each of the 13 canonical PWDB common measurement sites: 52 waveforms;
-- age;
-- heart rate;
-- stroke volume;
-- cardiac output;
-- brachial systolic pressure;
-- resolved runtime vascular geometry/model state.
-
-The 13 sites use the same solver-location mapping already frozen for healthy Gate-0 reconstruction:
+Supported waveform classes include:
 
 ```text
-AorticRoot
-ThorAorta
-AbdAorta
-IliacBif
-Carotid
-SupTemporal
-SupMidCerebral
-Brachial
-Radial
-Digital
-CommonIliac
-Femoral
-AntTibial
+P — pressure
+U — flow velocity
+A — luminal area
+Q — volumetric flow rate
 ```
 
-### Waveforms
-
-The full disease solver runs with its adaptive numerical time steps. Materialised `P/U/A/Q` are then deterministically interpolated onto the selected subject's original PWDB cardiac-cycle time coordinate obtained from the preserved aortic-root source inflow.
-
-This deliberately gives healthy and disease vectors a directly comparable time coordinate while leaving the numerical integration itself adaptive.
-
-Materialised quantities are calculated as:
+`Q` is derived from recomputed modelled velocity and area:
 
 ```text
-P = disease-solver pressure converted from Pa to mmHg
-A = disease-solver luminal cross-sectional area
-Q = disease-solver volumetric flow rate
-U = Q / A
+Q = U * A
 ```
 
-`Q` therefore remains physically identical to `U*A` after materialisation.
+The disease runtime does not reuse the healthy common-site waveform when a quantity is marked as recomputed.
 
-### Scalar values
+## 7. Quantity-status contract
 
-The following causal cardiac inputs are intentionally retained numerically:
+Every public/runtime disease quantity has one explicit status:
 
-```text
-age
-heart_rate
-stroke_volume
-```
+- `UNCHANGED_CAUSAL_INPUT`;
+- `MODEL_PARAMETER_MODIFIED`;
+- `RECOMPUTED`;
+- `DERIVED_FROM_RECOMPUTED`;
+- `NOT_SUPPORTED`.
 
-They are re-materialised in the counterfactual dataset with `MODELLED` evidence and `UNCHANGED_CAUSAL_INPUT` status. They are not relabelled as new source observations.
+Current v1 mapping:
 
-Cardiac output is recomputed from the preserved causal inputs:
-
-```text
-CO [L/min] = HR [beats/min] * SV [mL/beat] / 1000
-```
-
-Brachial systolic pressure is derived from the maximum of the modelled brachial pressure waveform.
-
-## Explicit quantity-status policy
-
-PR 4 records a `DiseaseQuantityStatus` separately from evidence class:
-
-| Quantity | Runtime status |
+| Quantity | Status |
 |---|---|
 | pressure | `RECOMPUTED` |
-| flow_velocity | `RECOMPUTED` |
-| luminal_area | `RECOMPUTED` |
-| flow_rate | `DERIVED_FROM_RECOMPUTED` |
-| age | `UNCHANGED_CAUSAL_INPUT` |
-| heart_rate | `UNCHANGED_CAUSAL_INPUT` |
-| stroke_volume | `UNCHANGED_CAUSAL_INPUT` |
-| cardiac_output | `RECOMPUTED` |
-| brachial_systolic_pressure | `DERIVED_FROM_RECOMPUTED` |
-| vascular_geometry | `MODEL_PARAMETER_MODIFIED` |
+| flow velocity | `RECOMPUTED` |
+| luminal area | `RECOMPUTED` |
+| flow rate | `DERIVED_FROM_RECOMPUTED` |
 | photoplethysmogram | `NOT_SUPPORTED` |
-| aortic_pulse_wave_velocity | `NOT_SUPPORTED` |
-| aortic_augmentation_index | `NOT_SUPPORTED` |
-| pressure_onset_time | `NOT_SUPPORTED` |
+| age | `UNCHANGED_CAUSAL_INPUT` |
+| heart rate | `UNCHANGED_CAUSAL_INPUT` |
+| stroke volume | `UNCHANGED_CAUSAL_INPUT` |
+| cardiac output | `RECOMPUTED` |
+| brachial systolic pressure | `DERIVED_FROM_RECOMPUTED` |
+| aortic pulse-wave velocity | `NOT_SUPPORTED` |
+| aortic augmentation index | `NOT_SUPPORTED` |
+| pressure onset time | `NOT_SUPPORTED` |
+| vascular geometry / retained wall state | `MODEL_PARAMETER_MODIFIED` |
 
-The structured runtime vascular-state payload retains the resolved axial radius/area profile and the wall-mechanical coefficients required to reproduce the solver state. For large-artery stiffening, lumen geometry is unchanged but wall beta is modified; consequently the combined runtime vascular-state result is classified `MODEL_PARAMETER_MODIFIED` rather than falsely declared unchanged.
+The purpose of this map is to prevent silent fallback to a healthy source value when the disease state cannot compute the corresponding quantity.
 
-## Unsupported quantities are not copied from health
+## 8. Geometry state
 
-PR 4 deliberately does **not** populate a healthy source value where the disease state lacks an implemented recomputation model.
+Runtime disease geometry is a structured model-state output associated with the disease dataset.
 
-In particular:
+`vascular_geometry` is marked `MODEL_PARAMETER_MODIFIED` for every frozen preset because the runtime state retains the geometry and wall-mechanical coefficients needed to reproduce the disease solver state.
 
-- PPG is not regenerated from the disease haemodynamics;
-- aortic PWV is not substituted by the PR-3 model-space cfPWV target or by the healthy source value;
-- augmentation index is not copied from the healthy parent;
-- pressure-onset times are not copied from the healthy parent.
+For large-artery stiffening, radii may remain unchanged while wall `beta` stiffness changes; the geometry/model-state status therefore still records the modification.
 
-Requests for these quantities fail explicitly as `NOT_SUPPORTED`.
+## 9. Runtime store
 
-This prevents a runtime disease patient from containing internally inconsistent healthy-derived metrics.
+`RuntimeDiseaseStore` and the runtime dataset abstractions provide content-addressed access to generated populations/results without rewriting the canonical source dataset.
 
-## Disease-qualified vector names
+The runtime layer is responsible for keeping healthy-source identity and disease-run identity distinct.
 
-Canonical scientific quantity identities remain unchanged. The runtime/source label carries the disease suffix frozen in PR 1.
+## 10. Solver execution identity
 
-Examples for carotid stenosis are:
+A materialized runtime result retains enough execution identity to distinguish scientifically relevant backend/scheme choices.
 
-```text
-pressure       -> P__vd_carotid_stenosis
-flow_velocity  -> U__vd_carotid_stenosis
-luminal_area   -> A__vd_carotid_stenosis
-flow_rate      -> Q__vd_carotid_stenosis
-age            -> age__vd_carotid_stenosis
-heart_rate     -> HR__vd_carotid_stenosis
-stroke_volume  -> SV__vd_carotid_stenosis
-cardiac_output -> CO__vd_carotid_stenosis
+The NumPy implementation is the reference/default. Optional JAX execution is separate and must remain within its documented qualification evidence.
+
+A backend choice does not change the disease specification itself.
+
+## 11. Portable runtime bundle
+
+`write_runtime_bundle(...)` exports a portable disease population representation containing, as applicable:
+
+- run identity;
+- parent/source identity;
+- disease request/specification;
+- canonical subject IDs;
+- scientific result JSON documents;
+- provenance records;
+- content checksums;
+- quantity statuses;
+- runtime/model warnings;
+- reconstruction/qualification state.
+
+The purpose is to make downstream analysis reproducible without requiring the network solver to be rerun.
+
+## 12. Bundle integrity
+
+A consumer should treat the bundle manifests/checksums as part of the scientific contract. A result whose checksum or subject/run identity fails verification must not be silently accepted or paired with a healthy record.
+
+HEMOSPACE response analysis explicitly verifies the persisted disease bundle/result identity before computing healthy-to-disease changes.
+
+## 13. Parameterized cohort runtime
+
+The parameterized-cohort layer plans a designed disease population before solver execution and then materializes the accepted assignments through the same deployed disease physics/runtime stack.
+
+The planner records rejected subject/severity combinations explicitly rather than clamping invalid disease requests.
+
+See:
+
+- [`VIRTUAL_DISEASE_COHORTS.md`](VIRTUAL_DISEASE_COHORTS.md)
+- [`PARAMETERIZED_COHORT_QUALIFICATION.md`](PARAMETERIZED_COHORT_QUALIFICATION.md)
+
+## 14. Public generation
+
+The runtime is available through:
+
+```python
+vq.disease.generate_population(...)
 ```
 
-Thus a runtime pressure waveform remains canonical quantity `pressure`; only its runtime vector label records the disease condition.
-
-## Runtime vascular geometry/model state
-
-A source PWDB geometry row stores segment endpoints, length, inlet/outlet radii, and terminal R/C values. That representation cannot faithfully preserve an internal focal stenosis or fusiform aneurysm because those diseases vary inside a source segment.
-
-PR 4 therefore materialises `RuntimeGeometrySegment` values containing the resolved one-dimensional solver state:
-
-- source segment ID and topology;
-- source segment length;
-- axial solver coordinate;
-- resolved reference radius profile;
-- resolved reference area profile;
-- resolved beta wall stiffness;
-- source Voigt gamma profile;
-- terminal resistance/compliance.
-
-Arrays are copied and made read-only. The parent source geometry remains available through the immutable healthy baseline retained by `RuntimeSubjectState`.
-
-## Provenance
-
-Every materialised runtime result has deterministic `MODELLED` provenance identifying:
-
-- exact runtime dataset identity and run ID;
-- exact parent PWDB dataset identity;
-- preserved parent canonical subject ID;
-- frozen disease condition and parameters;
-- preset/contract version;
-- disease quantity status;
-- modified source segment IDs;
-- solver options and final diagnostics;
-- population selection seed and deterministic SHA-256 ranking algorithm;
-- canonical PWDB model-configuration, geometry, and common-site-waveform artifact checksums;
-- disease-physics assumptions and citations;
-- runtime method/component version;
-- output identity and scientific warnings.
-
-The existing provenance v1 model permits direct provenance inputs only within the same dataset identity. PR 4 therefore does not falsify a cross-dataset input edge. Parent PWDB identity and source artifact checksums are encoded explicitly as immutable provenance facts.
-
-## Evidence and validity
-
-All runtime disease results use:
+and:
 
 ```text
-evidence = MODELLED
+vascuquest disease generate ...
 ```
 
-This includes quantities that are intentionally numerically invariant, such as age, because the result belongs to a counterfactual runtime dataset rather than the source dataset.
+The same runtime contracts apply to Python and CLI execution.
 
-Runtime results also carry warnings that:
+## 15. HEMOSPACE response consumption
 
-- the values are modelled and not clinical observations; and
-- healthy reconstruction acceptance thresholds remain unfrozen.
+HEMOSPACE can consume a complete persisted parameterized cohort bundle for a canonical subject and calculate:
 
-PR 4 does not promote these results to `SOURCE`, `RECONSTRUCTED`, or clinically validated evidence.
+- healthy endpoint;
+- modelled disease endpoint;
+- absolute change;
+- relative change where defined.
 
-## Numerical failure policy
+This operation does not rerun the solver.
 
-Population materialisation requires each subject's disease solver to reach its configured periodic-convergence criterion. A non-converged subject causes generation to fail rather than materialising a partial or silently questionable patient state.
+The correct interpretation is a paired counterfactual model response, not a clinical treatment effect.
 
-Likewise, unsupported quantities fail explicitly instead of falling back to healthy values.
+## 16. V1 post-processing integration
 
-## PR 4 non-goals
+Once runtime results exist, they can be consumed by:
 
-PR 4 contains no:
+- `vascuquest.analysis` for identity/alignment;
+- `vascuquest.mechanics` for derived pressure-area descriptors;
+- `vascuquest.spectral` for impedance/wave/spectral descriptors;
+- `vascuquest.stats` for subject/cohort inference;
+- `vascuquest.plot` for reproducible figures.
 
-- public `vascuquest disease ...` CLI command;
-- automatic persistent population save;
-- new source PWDB dataset registration;
-- modification of the canonical PWDB backend or schema resource;
-- synthetic PPG model;
-- disease-state augmentation-index algorithm;
-- disease-state onset-time algorithm;
-- clinical tonometry simulation;
-- Doppler-ultrasound simulation;
-- clinical diagnostic classification;
-- clinical-validation claim.
+These downstream layers must not mutate the runtime dataset or recompute disease physics implicitly.
 
-## Gate for PR 5
+## 17. Reproducibility checklist
 
-After PR 4 is manually reviewed and merged, PR 5 may expose the completed subsystem through the public command line. The final CLI must allow users to choose at least:
+A persisted/runtime experiment should retain:
 
-- patient count;
-- age group;
-- one of the four frozen disease conditions;
-- the condition parameters;
-- deterministic selection seed.
+- parent PWDB identity;
+- run ID;
+- disease condition and full parameter mapping;
+- canonical selected subject IDs;
+- selection seed/design;
+- backend/solver execution identity;
+- quantity statuses;
+- provenance records;
+- warnings/qualification state;
+- result/bundle checksums;
+- VascuQuest version.
 
-It may then expose the generated runtime dataset identity, preserved subject IDs, quantity statuses, supported retrieval/export pathways, and explicit scientific warnings without altering the canonical PWDB source dataset.
+## 18. Non-claims
+
+Runtime materialization does not establish:
+
+- clinical patient equivalence;
+- patient-specific diagnosis/prognosis;
+- epidemiological representativeness;
+- treatment efficacy;
+- support for quantities marked `NOT_SUPPORTED`;
+- three-dimensional CFD/FSI fidelity;
+- biological disease progression/remodeling.
+
+## 19. Related documentation
+
+- [`VIRTUAL_DISEASE.md`](VIRTUAL_DISEASE.md)
+- [`VIRTUAL_DISEASE_RECONSTRUCTION.md`](VIRTUAL_DISEASE_RECONSTRUCTION.md)
+- [`VIRTUAL_DISEASE_PHYSICS.md`](VIRTUAL_DISEASE_PHYSICS.md)
+- [`VIRTUAL_DISEASE_PUBLIC.md`](VIRTUAL_DISEASE_PUBLIC.md)
+- [`VIRTUAL_DISEASE_COHORTS.md`](VIRTUAL_DISEASE_COHORTS.md)
+- [`HEMOSPACE.md`](HEMOSPACE.md)

@@ -200,6 +200,8 @@ Closure also checks scalar-source coverage and requested geometry/common-site-wa
 
 The unified 701.7 MB legacy MAT representation contains a small exporter-only metadata remainder for which there is no bounded per-subject access path. HEMOSPACE reports this explicitly rather than loading the complete legacy MAT file simply to make a completeness claim. Consequently, closure can report `CLOSED_WITH_DECLARED_SOURCE_FORMAT_LIMITATION` when operational coverage is complete but this bounded-access limitation remains.
 
+Downstream mechanics, spectral analysis, statistics, or plotting do not change this closure state. They may derive new research outputs from information already available, but they do not turn absent PWDB information into source knowledge.
+
 ## 8. What HEMOSPACE refuses to invent
 
 The record explicitly marks categories that PWDB alone cannot identify, including:
@@ -218,7 +220,31 @@ Age groups are not repeated observations of the same biological individual.
 
 HEMOSPACE also does not infer rupture risk, clinical stroke risk, plaque vulnerability, thrombosis, wall shear stress, or 3-D recirculation from the one-dimensional source/disease representation.
 
-## 9. Python API
+## 9. VascuQuest 1.0 research-analysis integration
+
+HEMOSPACE is the comprehensive phenotype/knowledge layer, while the v1 research namespaces are downstream analytical layers:
+
+```text
+HEMOSPACE/core ScientificResult or Waveform
+        ↓
+vascuquest.analysis
+        ↓
+vascuquest.mechanics and/or vascuquest.spectral
+        ↓
+vascuquest.stats
+        ↓
+vascuquest.plot
+```
+
+This division prevents HEMOSPACE from becoming an unbounded feature generator.
+
+Use `vascuquest.mechanics` when the study requires standardized v1 pressure-area/wave-mechanics method IDs and assumptions beyond the concise HEMOSPACE record summaries. Use `vascuquest.spectral` for configurable harmonics, impedance, wave separation, wave intensity, coherence, transfer functions, STFT, or wavelets.
+
+For cohort research, compute subject-level derived endpoints while preserving canonical subject IDs, then perform statistical analysis on the aligned cohort vector. Time samples or frequency bins from one subject must not be treated as independent subjects.
+
+Publication figures should be generated from explicit scientific/statistical results. `vascuquest.plot` does not silently recompute statistics or thin cohorts.
+
+## 10. Python API
 
 ```python
 from vascuquest.hemospace import open_hemospace
@@ -236,7 +262,7 @@ response = hs.response("./cohort-run", "2104")
 closure = hs.closure("2104")
 ```
 
-## 10. Reproducibility requirements
+## 11. Reproducibility requirements
 
 A HEMOSPACE analysis should retain at minimum:
 
@@ -248,7 +274,11 @@ A HEMOSPACE analysis should retain at minimum:
 - disease condition/severity/run identity for MODELLED results;
 - evidence class of reported quantities;
 - relevant warnings/assumptions;
-- closure status when claiming comprehensive knowledge.
+- closure status when claiming comprehensive knowledge;
+- downstream analysis method IDs/parameters where applicable;
+- statistical seeds/resample counts where applicable;
+- figure-spec JSON when a publication figure is produced;
+- VascuQuest version.
 
 See also:
 
@@ -257,3 +287,8 @@ See also:
 - `HEMOSPACE_KNOWLEDGE_CLOSURE.md`
 - `HEMOSPACE_PATH_QUALIFICATION.md`
 - `HEMOSPACE_AGENT.md`
+- `ANALYSIS.md`
+- `STATS.md`
+- `VASCULAR_MECHANICS.md`
+- `SPECTRAL_ANALYSIS.md`
+- `PLOTTING.md`
