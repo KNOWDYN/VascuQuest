@@ -5,6 +5,7 @@ from ._version import __version__
 from .api import DatasetSession
 from .bootstrap import open_dataset, register_source
 from . import disease as disease
+from . import hemospace as hemospace
 from .domain import (
     Cohort,
     DatasetIdentity,
@@ -66,6 +67,7 @@ __all__ = [
     "Waveform",
     "__version__",
     "disease",
+    "hemospace",
     "open_dataset",
     "plugins",
     "register_source",

@@ -23,6 +23,7 @@ from vascuquest.errors import (
     VascuQuestError,
     VascuQuestInternalError,
 )
+from vascuquest.hemospace.cli import hemospace_app
 
 from .commands import register_commands
 from .disease_commands import disease_app
@@ -68,6 +69,7 @@ def _root(
 register_commands(app)
 disease_app.add_typer(cohort_app, name="cohort")
 app.add_typer(disease_app, name="disease")
+app.add_typer(hemospace_app, name="hemospace")
 
 
 def _exit_code(exc: VascuQuestError) -> int:
