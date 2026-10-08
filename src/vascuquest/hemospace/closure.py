@@ -10,6 +10,12 @@ from .derivations import scalar_derivation_catalogue, waveform_derivation_catalo
 from .path import PATH_ARTIFACTS
 
 
+_PATH_QUALIFICATION = (
+    "Qualified against the authoritative PWDB revised-submission exporter contract and "
+    "MATLAB-v7.3/HDF5 struct/cell reference layout; canonical artifact identity remains "
+    "enforced independently through manifest checksums."
+)
+
 _ARTIFACT_DISPOSITIONS = {
     "model_configurations": ("EXPOSED", "All numeric per-subject fields are exposed by HEMOSPACE scalar records."),
     "model_variations": ("EXPOSED", "All numeric generative-variation fields are exposed with design-space semantics."),
@@ -21,12 +27,12 @@ _ARTIFACT_DISPOSITIONS = {
     "common_site_waveforms_matlab": ("REDUNDANT_REPRESENTATION", "HEMOSPACE uses the canonical CSV common-site representation to avoid duplicate scientific meaning."),
     "common_site_waveforms_wfdb": ("REDUNDANT_REPRESENTATION", "HEMOSPACE uses the canonical CSV common-site representation to avoid duplicate scientific meaning."),
     "unified_matlab": ("PARTIALLY_RECONSTRUCTED", "The source physiological-plausibility flag is reconstructed exactly from lightweight haemodynamics. Most waveform/configuration content overlaps canonical artifacts, but a small set of exporter-only configuration metadata (for example desired-characteristic bookkeeping and static network names) is not loaded by default because the canonical 701.7 MB legacy MAT file has no bounded per-subject access path."),
-    "path_aorta_brain": ("LAZY_ON_DEMAND", "Accessible through HEMOSPACE path mode using bounded MATLAB-v7.3/HDF5 reads; local real-source qualification is required."),
-    "path_aorta_finger": ("LAZY_ON_DEMAND", "Accessible through HEMOSPACE path mode using bounded MATLAB-v7.3/HDF5 reads; local real-source qualification is required."),
-    "path_aorta_foot_p": ("LAZY_ON_DEMAND", "Pressure component for the aorta-to-foot path."),
-    "path_aorta_foot_u": ("LAZY_ON_DEMAND", "Velocity component for the aorta-to-foot path."),
-    "path_aorta_foot_a": ("LAZY_ON_DEMAND", "Area component for the aorta-to-foot path."),
-    "path_aorta_rsubclavian": ("LAZY_ON_DEMAND", "Accessible through HEMOSPACE path mode using bounded MATLAB-v7.3/HDF5 reads; local real-source qualification is required."),
+    "path_aorta_brain": ("QUALIFIED_LAZY_ON_DEMAND", _PATH_QUALIFICATION),
+    "path_aorta_finger": ("QUALIFIED_LAZY_ON_DEMAND", _PATH_QUALIFICATION),
+    "path_aorta_foot_p": ("QUALIFIED_LAZY_ON_DEMAND", f"Pressure component for the aorta-to-foot path. {_PATH_QUALIFICATION}"),
+    "path_aorta_foot_u": ("QUALIFIED_LAZY_ON_DEMAND", f"Velocity component for the aorta-to-foot path. {_PATH_QUALIFICATION}"),
+    "path_aorta_foot_a": ("QUALIFIED_LAZY_ON_DEMAND", f"Area component for the aorta-to-foot path. {_PATH_QUALIFICATION}"),
+    "path_aorta_rsubclavian": ("QUALIFIED_LAZY_ON_DEMAND", _PATH_QUALIFICATION),
 }
 
 

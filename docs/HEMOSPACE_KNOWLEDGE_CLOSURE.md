@@ -18,7 +18,7 @@ A record is not considered comprehensive because it contains many variables. It 
 | `common_site_waveforms_matlab` | redundant common-site representation |
 | `common_site_waveforms_wfdb` | redundant common-site representation; WFDB export metadata supplies the dataset male population assumption |
 | `unified_matlab` | overlapping content represented elsewhere; source physiological-plausibility gate reconstructed; small exporter-only metadata remainder has a declared bounded-access limitation |
-| path MAT artifacts | lazy on-demand path mode with explicit real-source qualification flag |
+| path MAT artifacts | qualified lazy on-demand path mode under `QUALIFIED_AUTHORITATIVE_EXPORTER_CONTRACT` |
 
 ## Source field closure
 
@@ -77,15 +77,19 @@ This means operational scientific knowledge for the requested depth is closed wh
 
 ## Path reader qualification
 
-The path reader is implemented against the canonical MATLAB-v7.3/HDF5 structure documented by the upstream PWDB exporter and performs bounded dereferencing by subject/path point.
-
-Because the canonical path files are multi-gigabyte and excluded from ordinary CI, path profiles carry:
+The path reader is qualified as:
 
 ```text
-IMPLEMENTED_REQUIRES_LOCAL_REAL_SOURCE_QUALIFICATION
+QUALIFIED_AUTHORITATIVE_EXPORTER_CONTRACT
 ```
 
-A publication relying on path-derived quantities should retain evidence of a successful run against the canonical artifact/checksum used.
+Qualification is anchored to the exact PWDB revised-submission exporter used for this dataset release, the canonical Zenodo path filenames/checksums, MATLAB-v7.3/HDF5 struct/cell object-reference conventions, and an executed regression fixture covering all supported path families including the split aorta→foot P/U/A representation.
+
+This is a reader-contract qualification. It establishes that HEMOSPACE decodes the structure produced by the authoritative generator and that the resulting path quantities are assembled correctly. It does not claim a fresh whole-artifact byte scan or reprocessing of all 4,374 virtual subjects. Canonical artifact identity remains independently protected by VascuQuest manifest/checksum verification.
+
+A publication relying on path-derived quantities should retain the canonical Zenodo DOI and artifact checksum used as ordinary provenance; it does not need a separate multi-gigabyte reader-qualification run.
+
+See `HEMOSPACE_PATH_QUALIFICATION.md` for the qualification certificate and executed test scope.
 
 ## Unknowable boundary
 

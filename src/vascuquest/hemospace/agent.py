@@ -31,7 +31,9 @@ def agent_contract() -> dict[str, object]:
                 "purpose": "Lazily characterize one canonical path-resolved PWDB source.",
                 "paths": sorted(PATH_ARTIFACTS),
                 "optional_dependency": "h5py via VascuQuest[path]",
-                "qualification": "implemented; local real-source qualification required for multi-GB canonical path artifacts",
+                "qualification": "QUALIFIED_AUTHORITATIVE_EXPORTER_CONTRACT",
+                "qualification_reference": "docs/HEMOSPACE_PATH_QUALIFICATION.md",
+                "qualification_boundary": "Authoritative PWDB exporter/storage contract plus canonical manifest/checksum identity; no fresh whole-artifact byte scan is implied.",
             },
             "cohort_select": {
                 "cli": "vascuquest hemospace cohort select",

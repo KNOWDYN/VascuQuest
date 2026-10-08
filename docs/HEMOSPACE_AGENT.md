@@ -147,15 +147,22 @@ Never call them:
 
 ## 10. Path-mode qualification
 
-Path access is implemented from the canonical upstream MATLAB exporter structure using bounded HDF5 reads. The multi-GB canonical path artifacts are not part of ordinary CI.
-
-If the returned path profile says:
+Path access uses bounded HDF5 reads against the canonical MATLAB-v7.3 structure. The reader is qualified as:
 
 ```text
-reader_qualification = IMPLEMENTED_REQUIRES_LOCAL_REAL_SOURCE_QUALIFICATION
+reader_qualification = QUALIFIED_AUTHORITATIVE_EXPORTER_CONTRACT
 ```
 
-preserve that qualification in scientific reporting. Do not silently describe the reader as fully source-qualified until a real canonical artifact run has been documented.
+The qualification was established from the exact PWDB revised-submission exporter, canonical Zenodo filenames/checksums, MATLAB-v7.3 struct/cell object-reference conventions, and an executed regression fixture covering all four supported path families, including the split aorta→foot P/U/A files.
+
+Interpretation rule:
+
+- the reader contract is qualified;
+- canonical artifact identity is still established at acquisition time by the VascuQuest manifest/checksum;
+- no fresh whole-artifact byte scan or 4,374-subject reprocessing is implied by the qualification;
+- continue reporting the actual canonical artifact DOI/checksum used in a study.
+
+See `HEMOSPACE_PATH_QUALIFICATION.md`.
 
 ## 11. Knowledge closure
 
