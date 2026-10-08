@@ -42,6 +42,9 @@ vascuquest = "vascuquest.cli.app:main"
 jax = [
     "jax>=0.5",
 ]
+path = [
+    "h5py>=3.11,<4",
+]
 dev = [
     "build>=1.2",
     "mypy>=1.15",
