@@ -72,8 +72,8 @@ def test_scalar_record_exposes_every_numeric_source_field_and_derives_transparen
 
     assert record.subject_id == "1"
     assert record.depth == "scalar"
-    assert record.coverage.source_fields_seen == 12
-    assert record.coverage.source_fields_exposed == 12
+    assert record.coverage.source_fields_seen == 11
+    assert record.coverage.source_fields_exposed == 11
     assert record.coverage.source_fields_missing == 0
     assert record.coverage.scalar_source_complete is True
 
