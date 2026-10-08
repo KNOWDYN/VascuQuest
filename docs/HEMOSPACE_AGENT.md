@@ -1,21 +1,39 @@
 # HEMOSPACE Agent Contract
 
-This document is for AI agents operating VascuQuest on behalf of human researchers.
+This document is for AI agents operating VascuQuest on behalf of human researchers. The machine-readable version is emitted by:
 
-## Core rule
+```bash
+vascuquest hemospace agent-contract
+```
 
-A HEMOSPACE record describes a **virtual cardiovascular simulation instance**, never a real patient. Do not silently convert simulated quantities into diagnoses, treatment recommendations, prognosis, or claims about an unencoded life history.
+## 1. Core interpretation rule
 
-## Record kind
+A HEMOSPACE record describes a **virtual cardiovascular simulation instance**. It is never a real patient record.
 
-Machine-readable records use:
+Do not silently convert simulated values into diagnoses, prognosis, treatment recommendations, epidemiological prevalence, or unencoded life history.
+
+## 2. Evidence handling
+
+Interpret evidence exactly:
+
+- `SOURCE` — direct canonical PWDB source value or source-export metadata;
+- `RECONSTRUCTED` — deterministic recovery from aligned source quantities;
+- `DERIVED` — calculation from an explicit declared method;
+- `INFERRED` — estimate from a separately qualified inference method;
+- `MODELLED` — output of an explicit disease/research model.
+
+Never promote `RECONSTRUCTED`, `DERIVED`, `INFERRED`, or `MODELLED` to `SOURCE` in summaries.
+
+## 3. Record schema
+
+Records use:
 
 ```text
 kind = vascuquest.hemospace.virtual_cardiovascular_record
 schema_version = hemospace-1
 ```
 
-The top-level object contains:
+Top-level fields:
 
 ```text
 dataset
@@ -27,9 +45,7 @@ unavailable_information
 warnings
 ```
 
-## Knowledge-item contract
-
-Every item contains:
+Each knowledge item contains:
 
 ```text
 canonical_id
@@ -46,102 +62,163 @@ assumptions
 notes
 ```
 
-Interpret `evidence` exactly:
+## 4. Generative-variation semantics
 
-- `SOURCE`: direct canonical PWDB source value.
-- `RECONSTRUCTED`: deterministic recovery from aligned source quantities.
-- `DERIVED`: calculation from an explicit definition.
-- `INFERRED`: estimate from a separately qualified inference method.
-- `MODELLED`: output of an explicit research model/operator.
-
-Never promote `RECONSTRUCTED`, `DERIVED`, `INFERRED`, or `MODELLED` to `SOURCE` in summaries.
-
-## Generative-variation semantics
-
-Items in section `generative_variation` originate from `pwdb_model_variations.csv`.
-
-Their unit is:
+`DIA`, `HR`, `LEN`, `LVET`, `MBP`, `PVC`, `PWV`, `RFV`, `SV`, and `PFT` from `pwdb_model_variations.csv` are **prescribed PWDB design-space deviations from the age-specific mean**. Unit:
 
 ```text
 SD_from_age_specific_mean
 ```
 
-This means prescribed deviation of a **model input** from the age-specific mean used to construct the virtual population. It does not mean a clinical z-score measured from a real person.
+They are not clinical z-scores.
 
-## Unknown source fields
+`AGE` in that table is a grouping/design value in years and must not be interpreted as an SD axis.
 
-HEMOSPACE deliberately retains unknown-but-numeric PWDB source columns using stable source-derived identifiers. If a field lacks documented unit or meaning:
+## 5. Population sex assumption
 
-1. report the raw source identity and value;
-2. do not guess the unit;
-3. do not infer clinical meaning;
-4. consult authoritative PWDB documentation before proposing semantic promotion.
+PWDB's upstream WFDB exporter labels every virtual recording as `male`. HEMOSPACE exposes this as `model_population_sex_assumption`.
 
-## Coverage
+Interpretation:
 
-Before claiming that a record is comprehensive, inspect `coverage`.
+- dataset/model-population assumption;
+- not an observed biological attribute of a real participant;
+- do not use it to infer sex-specific clinical outcomes.
 
-`scalar_source_complete=true` means every scalar source field encountered for the subject was either exposed or explicitly missing. It does **not** mean geometry or waveforms were included.
+## 6. Unknown source fields
 
-Check:
+HEMOSPACE retains numeric PWDB fields under stable source-derived IDs even when their semantic promotion is incomplete.
 
-```text
-geometry_included
-waveform_summaries_included
+If unit/meaning is not documented:
+
+1. preserve source field and value;
+2. do not guess a unit;
+3. do not invent clinical meaning;
+4. consult authoritative PWDB documentation before promoting the semantic definition.
+
+## 7. Depth selection
+
+Use `scalar` for cohort screening, generative physiology and source haemodynamics.
+
+Use `geometry` only when network anatomy/geometry is needed.
+
+Use `comprehensive` when common-site waveform morphology, vascular mechanics, flow integrals, energetics or local impedance descriptors are relevant.
+
+Use `hemospace path` only when continuous canonical path data are necessary. Path mode may acquire multi-GB artifacts and requires the optional `path` dependency.
+
+## 8. Cohort selection
+
+CLI:
+
+```bash
+vascuquest hemospace cohort select \
+  -c 'arterial_stiffness_variation>=1' \
+  -c 'large_artery_diameter_variation<=0' \
+  --profile carotid-stenosis \
+  --describe
 ```
 
-as separate completeness dimensions.
+Criteria are exact numeric comparisons against canonical HEMOSPACE IDs.
 
-## Depth selection
+Do not infer population prevalence from cohort counts. PWDB is a designed virtual population.
 
-Use `scalar` for lightweight cohort screening and physiological characterization.
+Built-in profiles are research scaffolds, not clinical protocols:
 
-Use `geometry` when anatomy or vascular-network structure matters.
+- carotid stenosis;
+- iliac stenosis;
+- fusiform AAA;
+- large-artery stiffening.
 
-Use `comprehensive` only when waveform morphology, local P/U/A/PPG behaviour, or reconstructed Q summaries are relevant. Comprehensive mode may require acquisition of the canonical common-site waveform archive.
+Always read the profile's `forbidden_claims` before interpreting results.
 
-## Forbidden gap filling
+## 9. Disease response
 
-Never invent values for entries listed in `unavailable_information`.
+`hemospace response` consumes persisted Virtual Disease cohort bundles. It must not rerun the disease solver.
 
-Examples include smoking, genetics, medications, symptoms, plaque composition, thrombotic state, renal function, longitudinal life history, and future clinical-event risk.
+A response item contains healthy baseline, modelled disease value, absolute change and relative change when defined.
 
-If a research task requires one of these concepts, explicitly state that PWDB alone cannot answer it and that an external dataset or separately declared model is required.
+Interpret all disease response items as `MODELLED` counterfactual effects.
 
-## Endovascular research use
+Never call them:
 
-Appropriate HEMOSPACE uses include:
+- treatment efficacy;
+- clinical outcome;
+- patient response;
+- event-risk reduction.
 
-- physiological cohort enrichment;
-- effect-modifier analysis;
-- disease-response stratification;
-- worst-case/boundary-case exploration within the represented PWDB design space;
-- endpoint selection;
-- mechanistic subgroup analysis;
-- source-coverage audits.
+## 10. Path-mode qualification
 
-Do not claim clinical treatment efficacy from HEMOSPACE records alone.
+Path access is implemented from the canonical upstream MATLAB exporter structure using bounded HDF5 reads. The multi-GB canonical path artifacts are not part of ordinary CI.
 
-## Recommended agent sequence
+If the returned path profile says:
 
 ```text
-1. hemospace record --depth scalar
-2. inspect coverage + unavailable_information
-3. identify relevant source/derived phenotype dimensions
-4. escalate to --depth geometry only if anatomy is needed
-5. escalate to --depth comprehensive only if waveform-level evidence is needed
-6. preserve evidence class in all downstream analyses
-7. cite the exact subject IDs, dataset record, selection rules, and disease specification
+reader_qualification = IMPLEMENTED_REQUIRES_LOCAL_REAL_SOURCE_QUALIFICATION
 ```
 
-## Reproducibility
+preserve that qualification in scientific reporting. Do not silently describe the reader as fully source-qualified until a real canonical artifact run has been documented.
 
-For any reported result retain:
+## 11. Knowledge closure
 
-- PWDB record identity `3275625`;
+Before claiming a subject record is comprehensive, run:
+
+```bash
+vascuquest hemospace closure --subject <ID> --depth comprehensive
+```
+
+`CLOSED_WITH_DECLARED_SOURCE_FORMAT_LIMITATION` means operational scalar/geometry/common-wave coverage is closed, but a bounded-access limitation remains for exporter-only metadata in the legacy unified MAT representation.
+
+Do not omit this qualifier when making completeness claims.
+
+## 12. Forbidden gap filling
+
+Never invent or infer from PWDB alone:
+
+- smoking history;
+- genetics;
+- renal function;
+- medications;
+- symptoms;
+- plaque composition;
+- thrombotic state;
+- longitudinal life events;
+- future clinical event risk.
+
+Do not infer from the 1-D disease engine alone:
+
+- wall shear stress;
+- 3-D recirculation;
+- aneurysm rupture risk;
+- plaque vulnerability;
+- clinical stroke risk;
+- thrombosis probability.
+
+## 13. Recommended agent workflow
+
+```text
+1. Read agent-contract.
+2. Select a built-in study profile if appropriate.
+3. Build scalar records or a phenotype cohort.
+4. Inspect coverage and unavailable_information.
+5. Escalate to geometry only if anatomy is needed.
+6. Escalate to comprehensive only if waveform/mechanics/energetics endpoints are needed.
+7. Request a path artifact only for a path-specific question.
+8. If disease results already exist, use response mode; never rerun them just to calculate paired changes.
+9. Preserve evidence class, units, source identity, assumptions and model-run identity.
+10. Run closure before using the word comprehensive.
+```
+
+## 14. Required reporting
+
+For every downstream scientific result retain:
+
+- PWDB DOI/record identity;
+- canonical subject IDs;
 - HEMOSPACE schema version;
-- canonical subject ID(s);
 - record depth;
-- source artifact/source field for `SOURCE` items;
-- method and assumptions for reconstructed/derived quantities;
-- disease specification and solver execution identity when modelled pathology is introduced elsewhere in VascuQuest.
+- cohort criteria/profile and selection ID;
+- evidence class;
+- source artifact/source field for SOURCE items;
+- method and assumptions for reconstructed/derived items;
+- disease run/condition/severity for MODELLED items;
+- relevant HEMOSPACE warnings;
+- knowledge-closure status when applicable.

@@ -32,7 +32,11 @@ class KnowledgeItem:
     notes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        for value, name in ((self.canonical_id, "canonical_id"), (self.label, "label"), (self.section, "section")):
+        for value, name in (
+            (self.canonical_id, "canonical_id"),
+            (self.label, "label"),
+            (self.section, "section"),
+        ):
             if not isinstance(value, str) or not value.strip() or value != value.strip():
                 raise ValueError(f"{name} must be a non-empty trimmed string")
         if self.evidence not in _ALLOWED_EVIDENCE:
@@ -63,7 +67,11 @@ class UnavailableKnowledge:
     reason: str
 
     def to_dict(self) -> dict[str, str]:
-        return {"canonical_id": self.canonical_id, "status": "NOT_KNOWABLE_FROM_PWDB", "reason": self.reason}
+        return {
+            "canonical_id": self.canonical_id,
+            "status": "NOT_KNOWABLE_FROM_PWDB",
+            "reason": self.reason,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,10 +85,21 @@ class KnowledgeCoverage:
     derived_items: int
     geometry_included: bool
     waveform_summaries_included: bool
+    common_site_waveforms_expected: int = 0
+    common_site_waveforms_summarized: int = 0
+    path_access_modes: tuple[str, ...] = ()
+    disease_response_included: bool = False
 
     @property
     def scalar_source_complete(self) -> bool:
         return self.source_fields_seen == self.source_fields_exposed + self.source_fields_missing
+
+    @property
+    def common_site_waveform_complete(self) -> bool:
+        return (
+            self.common_site_waveforms_expected > 0
+            and self.common_site_waveforms_summarized == self.common_site_waveforms_expected
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -91,6 +110,11 @@ class KnowledgeCoverage:
             "derived_items": self.derived_items,
             "geometry_included": self.geometry_included,
             "waveform_summaries_included": self.waveform_summaries_included,
+            "common_site_waveforms_expected": self.common_site_waveforms_expected,
+            "common_site_waveforms_summarized": self.common_site_waveforms_summarized,
+            "common_site_waveform_complete": self.common_site_waveform_complete,
+            "path_access_modes": list(self.path_access_modes),
+            "disease_response_included": self.disease_response_included,
             "scalar_source_complete": self.scalar_source_complete,
         }
 
@@ -115,6 +139,12 @@ class VirtualCardiovascularRecord:
         for item in self.items:
             grouped.setdefault(item.section, []).append(item.to_dict())
         return grouped
+
+    def item(self, canonical_id: str) -> KnowledgeItem:
+        matches = tuple(item for item in self.items if item.canonical_id == canonical_id)
+        if len(matches) != 1:
+            raise KeyError(f"record has no unique HEMOSPACE item {canonical_id!r}")
+        return matches[0]
 
     def to_dict(self) -> dict[str, Any]:
         return {
