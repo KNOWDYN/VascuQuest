@@ -1,27 +1,31 @@
 # Virtual Disease causal physics
 
-## PR 3 status
+## 1. Purpose
 
-This document describes implementation stage 3 of 5 for the first-party VascuQuest Virtual Disease subsystem.
+This document defines the causal disease transformations used by the completed VascuQuest 1.0 Virtual Disease subsystem.
 
-PR 3 adds **causal disease transformations and disease-aware solver coupling only**. It does not create a runtime disease dataset, generate a virtual-disease population through the public API, materialise disease-qualified vectors, expose a disease-generation CLI, or make a clinical-validation claim.
-
-The healthy parent `BaselineCardiovascularState` introduced in PR 2 remains immutable. A disease request produces a separate `DiseasePhysicsModel` containing:
+A disease request is applied to an immutable healthy `BaselineCardiovascularState` and produces a separate `DiseasePhysicsModel` containing:
 
 - the unchanged healthy parent state;
-- the frozen `DiseaseSpecification`;
-- a transformed solver network;
-- any explicit local excess pressure-loss terms;
-- the exact set of modified PWDB segment IDs;
-- modelling assumptions and citations.
+- the canonical `DiseaseSpecification`;
+- the transformed solver network;
+- explicit localized excess pressure-loss terms where required;
+- the exact modified PWDB segment IDs;
+- assumptions and citations.
 
-This is the causal layer that later runtime-dataset work will execute and materialise.
+The disease layer changes model parameters/geometry causally and then relies on the disease-aware network solver to recompute haemodynamics. It never prescribes the desired output waveform.
 
-## Frozen anatomy
+## 2. Scientific boundary
 
-Disease targets are defined from the public PWDB 116-artery input network, not inferred from the 13 common waveform measurement sites.
+Every disease-state result is mechanistic `MODELLED` evidence. The implemented transformations are research interventions in the PWDB-compatible one-dimensional model.
 
-The frozen focal targets are:
+They are not clinical measurements, treatment simulations validated against patients, or three-dimensional CFD/FSI models.
+
+## 3. Frozen source anatomy
+
+Disease targets are defined from the canonical PWDB 116-artery input network, not inferred from the 13 common waveform measurement sites.
+
+Frozen focal targets include:
 
 | Disease target | PWDB segment |
 |---|---:|
@@ -34,144 +38,210 @@ The frozen focal targets are:
 | Left external iliac | 44 |
 | Right external iliac | 50 |
 
-The fusiform abdominal-aortic path is:
+The frozen main abdominal-aortic path used by the fusiform AAA model is:
 
 ```text
 28 -> 35 -> 37 -> 39 -> 41
 ```
 
-corresponding to the five main abdominal-aortic segments in the source 116-artery model.
+This anatomical distinction is intentional: source measurement-site conventions are not repurposed as disease anatomy.
 
-This distinction is intentional. A source measurement-site convention must not be repurposed as anatomical disease truth.
+## 4. Common model construction
 
-## Focal carotid and iliac stenosis
+For a healthy segment, the disease layer builds/retains solver meshes from the subject-specific source geometry and wall model.
 
-A requested diameter stenosis is imposed on the selected source artery as a smooth raised-cosine lumen reduction. The profile is continuous with the healthy radius at both lesion boundaries and reaches the requested relative diameter reduction at the lesion centre in the continuous model.
+Reference area is calculated from the local radius. Wall stiffness (`beta`) and Voigt/source wall terms are generated from the same healthy source parameterization unless the disease specifically modifies them.
 
-The lesion must fit entirely inside the selected PWDB segment. Executable v1 accepts
+Any transformed radius must remain positive and finite. Any wall-stiffness scale must remain positive and finite.
 
-```text
-0 <= diameter stenosis < 1
-```
+## 5. Focal stenosis geometry
 
-because complete geometric occlusion would create zero area and lies outside the open-vessel 1-D solver domain. A requested stenosis of zero is an exact causal no-op.
+Carotid and iliac stenoses use a smooth raised-cosine diameter-reduction profile over an explicit lesion interval.
 
-### Excess stenosis pressure loss
+The lesion:
 
-Changing the 1-D lumen alone does not recover all pressure loss caused by a focal stenosis, particularly the energy loss associated with downstream flow separation. PR 3 therefore adds an empirical Young/Seeley excess loss.
+- has finite positive length;
+- is centered by an explicit center fraction within the selected source segment;
+- must fit entirely inside the selected segment;
+- matches the healthy radius at both lesion boundaries;
+- reaches the requested relative diameter reduction at the center;
+- must satisfy an open-vessel executable range `0 <= severity < 1`.
 
-The reference model uses the familiar viscous and separation terms
+A requested stenosis severity of exactly zero is an exact causal no-op: the healthy network is returned without an excess loss term.
+
+## 6. Carotid stenosis
+
+The `carotid_stenosis` preset selects:
+
+- side: left/right;
+- artery: common/internal carotid;
+- NASCET-style relative diameter stenosis;
+- lesion length;
+- lesion center fraction.
+
+The geometry transform applies the raised-cosine narrowing to the chosen canonical carotid segment.
+
+The model is a mechanistic stenosis intervention. The requested stenosis parameter is not a claim of imaging-derived patient stenosis severity.
+
+## 7. Iliac stenosis
+
+The `iliac_stenosis` preset selects:
+
+- side: left/right;
+- artery: common/external iliac;
+- relative diameter stenosis;
+- lesion length;
+- lesion center fraction.
+
+It uses the same smooth focal-lumen principle and excess-loss treatment as the carotid model, targeted to the selected iliac source segment.
+
+## 8. Young/Seeley excess stenosis loss
+
+Changing the one-dimensional lumen alone does not represent all focal-stenosis energy loss, especially separation-related loss downstream of a narrowing. VascuQuest therefore supplements the native 1-D momentum model with an implemented Young/Seeley-style localized excess pressure-loss term.
+
+The reference coefficients include the familiar viscous/separation structure:
 
 ```text
 Kv = 32 (0.83 Ls + 1.64 Ds) / D0 * (A0 / As)^2
 Kt = 1.52
 ```
 
-with the corresponding pressure-loss dependence on `Q` and `Q|Q|`.
+with corresponding linear and quadratic flow-dependent pressure-loss contributions.
 
-VascuQuest does **not** simply add the full empirical formula on top of the native 1-D equations. The PR-2 solver already contains ordinary-vessel viscous friction and fluid inertia. To avoid double counting:
+The localized loss is distributed over the lesion support with normalized mesh weights.
 
-1. the unstenosed Young/Seeley viscous contribution is subtracted from the stenosed viscous coefficient;
-2. the separation term is added as an excess disease loss;
-3. the original empirical inertial term is not added a second time because fluid inertia is already present in the 1-D momentum equation.
+Important implementation boundary:
 
-The resulting local loss is distributed across the lesion with spatial weights whose integral is exactly one. Its sign follows the flow direction, so it opposes both forward and reverse flow.
+- the empirical excess viscous/separation terms supplement the native one-dimensional solver;
+- the original empirical inertial term is not added because the native 1-D momentum equation already contains fluid inertia.
 
-Scientific source: Seeley BD, Young DF. *Effect of geometry on pressure losses across models of arterial stenoses*. Journal of Biomechanics. 1976;9(7):439-448. DOI `10.1016/0021-9290(76)90086-5`.
+The implementation records the Seeley/Young citation in the disease physics metadata.
 
-## Fusiform abdominal aortic aneurysm
+## 9. Fusiform abdominal aortic aneurysm
 
-The v1 AAA preset applies a smooth fusiform dilation over the frozen main abdominal-aortic path. `maximum_diameter_m` is interpreted as an absolute model-space lumen diameter.
+The `fusiform_abdominal_aortic_aneurysm` preset applies an idealized smooth fusiform dilation over the frozen main abdominal-aortic path.
 
-The requested aneurysm must:
+Parameters include:
 
-- fit completely inside the frozen abdominal-aortic path; and
-- have a requested maximum diameter greater than the healthy diameter everywhere covered by the requested aneurysm region.
+- absolute maximum model-space lumen diameter;
+- aneurysm length;
+- center fraction along the frozen path.
 
-Reference area, PWDB wall stiffness and source Voigt-wall coefficients are then recalculated from the transformed local radius using the same constitutive relations used by the PR-2 solver.
+The requested aneurysm region must fit entirely inside the frozen path. The requested maximum radius/diameter must exceed the healthy diameter throughout the affected region so the transform represents dilation rather than accidental narrowing.
 
-No separate empirical aneurysm pressure-loss term is introduced in PR 3. The 1-D solver propagates the consequences of the smooth geometric dilation, but v1 does **not** represent three-dimensional aneurysm vortices, recirculation, intraluminal thrombus, wall thickness, asymmetric sac geometry, rupture mechanics, or remodelling.
+The smooth raised-cosine spatial envelope blends the healthy local radius into the requested target radius and back to the healthy path.
 
-## Large-artery stiffening
+Affected segment meshes are regenerated from the dilated radius field so area and wall coefficients are consistent with the transformed local geometry.
 
-The preset parameter `target_cfpwv_m_per_s` is implemented as a **model-space carotid-femoral characteristic PWV target**, not as a simulated clinical tonometry procedure.
+## 10. AAA non-claims
 
-The baseline value is calculated from the differential characteristic travel distance and travel time between frozen left carotid and left femoral paths. At the diastolic reference state, wave speed follows the same PR-2 pressure-area law. The target is achieved by uniformly scaling `beta` over the frozen bilateral large-conduit segment set by
+The one-dimensional fusiform AAA model does **not** represent:
 
-```text
-beta scale = (target model cfPWV / baseline model cfPWV)^2
-```
+- three-dimensional aneurysm vortices;
+- recirculation structures;
+- wall shear stress fields;
+- asymmetric sac morphology;
+- intraluminal thrombus;
+- local wall-thickness remodeling;
+- rupture mechanics/risk;
+- growth/remodeling over time.
 
-because characteristic wave speed is proportional to `sqrt(beta)` at fixed reference area and density.
+Its scientific claim is limited to the systemic/one-dimensional haemodynamic consequences of the explicit idealized dilation within the deployed network model.
 
-The transform:
+## 11. Large-artery stiffening
 
-- rejects targets below the subject's baseline model-space cfPWV because that would be softening, not stiffening;
-- leaves reference geometry unchanged;
-- leaves the source Voigt wall-viscosity coefficient unchanged;
-- leaves cardiac inflow and terminal beds unchanged.
+The `large_artery_stiffening` preset changes wall stiffness over a frozen conduit-artery set while preserving healthy radii.
 
-## Parent-state immutability
+The causal target is an explicit model-space carotid-femoral PWV value (`target_cfpwv_m_per_s`). VascuQuest computes the subject's baseline model-space differential characteristic PWV from the frozen carotid/femoral travel paths and solves for the wall-stiffness scaling required to reach the admissible target.
 
-No transformation mutates the healthy PWDB state. In particular, PR 3 does not overwrite:
+The target must not be below the subject's baseline when the condition is specifically “stiffening.”
 
-- source segment lengths or radii;
-- source model-configuration values;
-- aortic-root inflow;
-- age, heart rate or stroke volume;
-- terminal Windkessel parameters;
-- canonical PWDB subject identity.
+The transform changes the retained wall `beta` state of the selected large arteries; it does not need to change source radii.
 
-Only the separate transformed solver model carries disease causality.
+## 12. cfPWV interpretation
 
-## Disease-aware solver
+The large-artery-stiffening target is a model-space propagation quantity computed from the deployed 1-D wall/network representation and frozen travel paths.
 
-`DiseaseOneDSolver` is separate from `NativeOneDSolver`. The healthy Gate-0 solver therefore remains unchanged.
+It must not be described as a clinical carotid-femoral tonometry measurement or clinical arterial-age diagnosis.
 
-The disease solver reuses the PR-2 finite-volume fluxes, wall law, Voigt source, junction coupling, terminal boundaries, time integration and convergence machinery. It adds only the explicit local excess pressure-loss source required by transformed focal stenoses.
+## 13. Unchanged causal inputs
 
-Fast verification checks include:
+Unless a preset explicitly modifies a quantity/model parameter, the healthy parent inputs remain unchanged. Examples include the preserved healthy cardiac inflow and terminal-bed state for the four frozen arterial interventions.
 
-- exact source-anatomy target mappings;
-- zero-stenosis no-op behaviour;
-- signed and severity-sensitive Young/Seeley excess loss;
-- focal target-only geometry changes;
-- iliac execution on the frozen source segment;
-- AAA changes restricted to the frozen abdominal-aortic path;
-- rejection of a non-dilating AAA request;
-- exact model-space cfPWV target identity under stiffening;
-- rejection of softening through the stiffening preset;
-- preservation of a zero-flow/reference-pressure equilibrium even when a local disease-loss term is present.
+This helps isolate the controlled vascular intervention from unrelated physiological changes.
 
-These are software and mechanistic-model verification tests. They are not clinical validation.
+## 14. Modified-segment identity
 
-## Critical qualification boundary
+Every `DiseasePhysicsModel` records the exact canonical segment IDs whose geometry/wall state was modified.
 
-PR 2 deliberately left healthy PWDB reconstruction at:
+This is important for:
 
-```text
-METRICS_ONLY_THRESHOLDS_NOT_FROZEN
-```
+- provenance;
+- reproducibility;
+- anatomy audits;
+- runtime geometry materialization;
+- downstream research interpretation.
 
-PR 3 does not change that state and does not tune any disease parameter to reduce healthy reconstruction error.
+## 15. Solver coupling
 
-Therefore the existence of executable disease transformations does **not** yet authorise a production disease-population claim. Real-source healthy reconstruction tolerances and the later disease credibility/qualification programme remain mandatory before production use.
+The transformed network and localized loss terms are consumed by the same disease-aware one-dimensional solver framework documented in the reconstruction/runtime references.
 
-## PR 3 non-goals
+The disease transformation itself does not fabricate output P/U/A/Q. Those outputs are recomputed by network integration.
 
-PR 3 contains no:
+## 16. Zero-intervention behavior
 
-- public runtime virtual-disease dataset;
-- generated disease population through `DatasetSession`;
-- disease-qualified `ScientificResult` vectors;
-- public disease exporter;
-- public disease-generation CLI;
-- Doppler-ultrasound simulation;
-- clinical diagnostic classification;
-- claim that the four disease models reproduce real patients.
+Where a disease parameter permits a true zero/no-op state, the implementation must reproduce the healthy causal state exactly rather than introduce numerical/geometric perturbation merely because a disease object was constructed.
 
-Those remain gated behind subsequent implementation and validation stages.
+This invariant is tested explicitly for focal stenosis.
 
-## Gate for PR 4
+## 17. Admissibility
 
-PR 4 may materialise a disease-transformed subject/population only after this PR is manually reviewed and merged. It must preserve the parent PWDB identity, causal disease specification, solver provenance, quantity-status classification and `MODELLED` evidence boundary. PR 4 must not silently upgrade the scientific credibility of PR-3 transformations.
+Subject-specific transforms may reject a request when the intervention cannot be represented physically/geometrically within that subject's source anatomy.
+
+Examples include:
+
+- a stenosis lesion that does not fit within the target segment;
+- an AAA region that does not fit the frozen path;
+- an AAA maximum diameter that does not represent dilation relative to the local healthy vessel;
+- a stiffening target below the subject's baseline model-space cfPWV.
+
+Parameterized cohort planning uses these same deployed transforms as the admissibility authority. It does not silently clamp invalid severities.
+
+## 18. Downstream v1 analytics
+
+`vascuquest.analysis`, `stats`, `mechanics`, `spectral`, and `plot` consume outputs generated by these physics; they do not modify these transforms.
+
+For example, a downstream mechanics calculation may derive area distensibility from modelled P/A waveforms, but it cannot change the stenosis geometry or wall-law parameterization that generated those waveforms.
+
+## 19. Citations
+
+The physics layer records references including:
+
+- the canonical PWDB model/publication DOI `10.1152/ajpheart.00218.2019`;
+- the source 116-artery model reference recorded by VascuQuest;
+- the implemented Seeley/Young stenosis-loss reference for focal stenosis.
+
+Research publications should cite the particular model literature relevant to the intervention being reported.
+
+## 20. Non-claims
+
+Virtual Disease physics does not claim:
+
+- clinical diagnosis or prognosis;
+- clinical stenosis grading from imaging;
+- device-treatment efficacy;
+- plaque composition/vulnerability;
+- thrombus formation;
+- embolic/stroke risk;
+- AAA rupture risk;
+- three-dimensional recirculation;
+- wall shear stress;
+- patient-specific tissue mechanics;
+- biological remodeling/progression.
+
+## 21. Related documentation
+
+- [`VIRTUAL_DISEASE.md`](VIRTUAL_DISEASE.md)
+- [`VIRTUAL_DISEASE_RECONSTRUCTION.md`](VIRTUAL_DISEASE_RECONSTRUCTION.md)
+- [`VIRTUAL_DISEASE_RUNTIME.md`](VIRTUAL_DISEASE_RUNTIME.md)
+- [`VIRTUAL_DISEASE_COHORTS.md`](VIRTUAL_DISEASE_COHORTS.md)

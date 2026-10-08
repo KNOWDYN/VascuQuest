@@ -1,10 +1,12 @@
 # HEMOSPACE Agent Contract
 
-This document is for AI agents operating VascuQuest on behalf of human researchers. The machine-readable version is emitted by:
+This document is for AI agents operating VascuQuest on behalf of human researchers. The machine-readable HEMOSPACE contract is emitted by:
 
 ```bash
 vascuquest hemospace agent-contract
 ```
+
+This human-readable contract additionally explains how HEMOSPACE participates in the completed VascuQuest 1.0 analysis stack.
 
 ## 1. Core interpretation rule
 
@@ -23,6 +25,8 @@ Interpret evidence exactly:
 - `MODELLED` — output of an explicit disease/research model.
 
 Never promote `RECONSTRUCTED`, `DERIVED`, `INFERRED`, or `MODELLED` to `SOURCE` in summaries.
+
+A downstream statistic or figure does not change the evidence status of the physiological/model input. For example, a p-value derived from `MODELLED` disease responses is a derived statistic about modelled counterfactuals, not clinical evidence.
 
 ## 3. Record schema
 
@@ -101,9 +105,11 @@ Use `scalar` for cohort screening, generative physiology and source haemodynamic
 
 Use `geometry` only when network anatomy/geometry is needed.
 
-Use `comprehensive` when common-site waveform morphology, vascular mechanics, flow integrals, energetics or local impedance descriptors are relevant.
+Use `comprehensive` when common-site waveform morphology, flow integrals, energetics, HEMOSPACE-native mechanics, or local impedance summaries are relevant.
 
-Use `hemospace path` only when continuous canonical path data are necessary. Path mode may acquire multi-GB artifacts and requires the optional `path` dependency.
+Use `hemospace path` only when canonical path-resolved source data are necessary. Path mode may acquire multi-GB artifacts and requires the optional `path` dependency.
+
+Do not request deeper records or path artifacts merely because they exist. Use the least expensive source depth that answers the scientific question.
 
 ## 8. Cohort selection
 
@@ -176,6 +182,8 @@ vascuquest hemospace closure --subject <ID> --depth comprehensive
 
 Do not omit this qualifier when making completeness claims.
 
+The v1 analysis stack does not change HEMOSPACE knowledge closure. Statistics, mechanics, spectral analysis and plotting can derive new research outputs from known data, but they do not make previously unknowable PWDB information knowable.
+
 ## 12. Forbidden gap filling
 
 Never invent or infer from PWDB alone:
@@ -199,24 +207,69 @@ Do not infer from the 1-D disease engine alone:
 - clinical stroke risk;
 - thrombosis probability.
 
-## 13. Recommended agent workflow
+## 13. VascuQuest 1.0 downstream-analysis rule
+
+HEMOSPACE is the phenotype/knowledge layer. The new research namespaces are downstream consumers:
 
 ```text
-1. Read agent-contract.
-2. Select a built-in study profile if appropriate.
-3. Build scalar records or a phenotype cohort.
-4. Inspect coverage and unavailable_information.
-5. Escalate to geometry only if anatomy is needed.
-6. Escalate to comprehensive only if waveform/mechanics/energetics endpoints are needed.
-7. Request a path artifact only for a path-specific question.
-8. If disease results already exist, use response mode; never rerun them just to calculate paired changes.
-9. Preserve evidence class, units, source identity, assumptions and model-run identity.
-10. Run closure before using the word comprehensive.
+HEMOSPACE/core ScientificResult or Waveform
+        ↓
+vascuquest.analysis
+        ↓
+vascuquest.mechanics and/or vascuquest.spectral
+        ↓
+vascuquest.stats
+        ↓
+vascuquest.plot
 ```
 
-## 14. Required reporting
+Use only the stages required by the question.
 
-For every downstream scientific result retain:
+Hard rules for agents:
+
+1. Never strip a HEMOSPACE/core result to anonymous arrays before checking dataset, subject/cohort, location, unit and coordinate compatibility.
+2. Never pair healthy and disease values by row number when canonical subject IDs exist.
+3. Never silently resample misaligned waveforms.
+4. Never call the disease solver from a downstream analysis merely because a persisted disease result is available.
+5. Never treat many time samples or frequency bins from one subject as independent subjects.
+6. Never infer epidemiological probability from a designed virtual cohort.
+7. Never let plotting recompute hidden statistics; statistical annotations must originate from explicit analytical results.
+8. Never silently thin a large cohort for plotting; rasterization is allowed because it changes rendering, not observations.
+
+## 14. Mechanics and spectral ownership
+
+HEMOSPACE includes selected deterministic waveform summaries such as area compliance/distensibility and first pressure-flow impedance harmonics as part of the Virtual Cardiovascular Record.
+
+For a dedicated research analysis requiring standardized v1 method identities, configurable parameters, subject-level cohort propagation, advanced pressure-area mechanics, impedance, wave separation, wave intensity, coherence, transfer functions, STFT or wavelets, use:
+
+- `vascuquest.mechanics`;
+- `vascuquest.spectral`.
+
+Do not assume that similarly named HEMOSPACE summary fields and dedicated research-method outputs are interchangeable unless their definitions, units and assumptions match exactly.
+
+## 15. Recommended agent workflow
+
+```text
+1. Read agent-contract and the relevant subsystem documentation.
+2. Define the scientific question and required evidence class before requesting data.
+3. Select a built-in HEMOSPACE study profile if appropriate.
+4. Build scalar records or a phenotype cohort.
+5. Inspect coverage and unavailable_information.
+6. Escalate to geometry only if anatomy is needed.
+7. Escalate to comprehensive only if waveform/energetics endpoints are needed.
+8. Request a path artifact only for a genuinely path-specific question.
+9. If disease results already exist, use persisted bundle/response mode; never rerun them just to calculate paired changes.
+10. Convert required native results into the common analysis contract without losing identity/alignment metadata.
+11. Apply mechanics/spectral operations only when their assumptions are satisfied.
+12. Apply statistics using the correct paired/independent/design semantics.
+13. Build figures from explicit scientific/statistical results; keep all legends outside scientific axes and preserve all cohort observations.
+14. Preserve evidence class, units, source identity, method IDs, assumptions and model-run identity.
+15. Run closure before using the word comprehensive.
+```
+
+## 16. Required reporting
+
+For every downstream scientific result retain, as applicable:
 
 - PWDB DOI/record identity;
 - canonical subject IDs;
@@ -227,5 +280,14 @@ For every downstream scientific result retain:
 - source artifact/source field for SOURCE items;
 - method and assumptions for reconstructed/derived items;
 - disease run/condition/severity for MODELLED items;
+- analysis method ID and parameters;
+- statistical seed/resample count where applicable;
+- waveform sampling and spectral/mechanics assumptions where applicable;
 - relevant HEMOSPACE warnings;
-- knowledge-closure status when applicable.
+- knowledge-closure status when applicable;
+- figure-spec JSON when a publication figure is generated;
+- VascuQuest version.
+
+## 17. Documentation precedence
+
+For current product behavior, follow `docs/README.md` and the governing v1.0 contracts. Machine-readable qualification evidence and historical documents retain their original scope and wording and must not be generalized beyond that scope.

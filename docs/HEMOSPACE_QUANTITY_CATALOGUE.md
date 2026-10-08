@@ -1,6 +1,21 @@
 # HEMOSPACE Quantity Catalogue
 
-This catalogue defines the scientific interpretation of the principal HEMOSPACE knowledge families. The machine record remains authoritative for exact source field, unit, location, evidence class and assumptions.
+This catalogue defines the scientific interpretation of the principal HEMOSPACE knowledge families in VascuQuest 1.0. The machine record remains authoritative for exact source field, unit, location, evidence class and assumptions.
+
+## Relationship to the v1 research namespaces
+
+HEMOSPACE is the phenotype/knowledge layer. It includes concise deterministic summaries needed to make a Virtual Cardiovascular Record scientifically useful, including selected compliance/distensibility and impedance descriptors.
+
+VascuQuest 1.0 also provides dedicated research namespaces:
+
+- `vascuquest.mechanics` for standardized pressure-area/wave-mechanics methods;
+- `vascuquest.spectral` for standardized frequency/wave/impedance/time-frequency methods;
+- `vascuquest.stats` for subject/cohort inference;
+- `vascuquest.plot` for reproducible scientific figures.
+
+A similarly named HEMOSPACE summary and dedicated research-method output are not automatically interchangeable. Researchers must compare the exact definition, unit, method ID, normalization, assumptions and input context.
+
+HEMOSPACE knowledge closure concerns what is identifiable from PWDB and declared deterministic derivations. Downstream analytics do not make new source information appear and do not alter closure status.
 
 ## Source families
 
@@ -166,6 +181,8 @@ Unit: m²/mmHg.
 
 Unit: 1/mmHg.
 
+These HEMOSPACE values use the HEMOSPACE record definition/units. The dedicated `vascuquest.mechanics` methods normalize to their documented canonical units and method IDs; use the dedicated layer for research analyses that depend on those standardized contracts.
+
 ### Flow pulsatility index
 
 ```text
@@ -201,6 +218,8 @@ Z(f) = FFT(P - mean(P)) / FFT(Q - mean(Q))
 
 Each entry includes frequency, magnitude and phase. This is a local frequency-domain pressure-flow relation, not a directly measured clinical impedance spectrum.
 
+For configurable harmonic counts, standardized method IDs, characteristic-impedance estimates, wave separation, wave intensity, cross-site CSD/coherence/transfer, STFT or wavelets, use `vascuquest.spectral` and retain that method's assumptions/parameters.
+
 ## Geometry derivations
 
 From the 116-segment source geometry HEMOSPACE derives:
@@ -224,6 +243,8 @@ Where canonical path artifacts are available:
 
 The path reader is qualified as `QUALIFIED_AUTHORITATIVE_EXPORTER_CONTRACT`. Its decoding contract was checked against the exact PWDB revised-submission exporter, the canonical Zenodo artifact identities/checksums, MATLAB-v7.3/HDF5 struct/cell reference conventions, and an executed regression fixture covering combined path files and the split aorta→foot P/U/A representation. This qualifies the reader without implying a fresh full-artifact scan. See `HEMOSPACE_PATH_QUALIFICATION.md`.
 
+Path waveforms may subsequently be analyzed by the dedicated mechanics/spectral namespaces at stored source-supported positions. Those downstream outputs are research derivations, not additional PWDB source fields.
+
 ## Disease-response quantities
 
 HEMOSPACE response mode aligns the comprehensive healthy record with persisted MODELLED Virtual Disease waveforms for the same canonical subject and reports:
@@ -237,6 +258,10 @@ relative change (%) when baseline != 0
 
 These remain `MODELLED` counterfactual response quantities.
 
+For cohort-level inference, preserve canonical subject IDs and use `vascuquest.stats`; do not infer pairing from row order.
+
 ## Explicitly unavailable categories
 
 PWDB alone does not identify smoking history, genetics, renal function, medication history, symptoms, plaque composition, thrombotic state, longitudinal life history or future clinical-event risk.
+
+No mechanics, spectral, statistical or plotting operation can convert these unavailable categories into known PWDB facts without a separate external source/model.

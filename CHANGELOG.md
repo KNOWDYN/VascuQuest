@@ -48,6 +48,19 @@ VascuQuest becomes an in-silico vascular research platform while preserving the 
 - The HEMOSPACE dense-path reader is qualified as `QUALIFIED_AUTHORITATIVE_EXPORTER_CONTRACT`.
 - Virtual Disease provides four mechanistic presets: carotid stenosis, iliac stenosis, fusiform abdominal-aortic aneurysm and large-artery stiffening.
 - Existing qualified disease physics and evidence remain unchanged by the v1 analysis stack.
+- Parameterized disease cohorts provide deterministic plan/generate/inspect/verify workflows over source-supported ages and explicit severity ranges.
+- The scalar JAX disease-backend qualification remains bounded by `docs/evidence/JAX_SCALAR_QUALIFICATION.json`; current human-readable JAX and parameterized-cohort qualification documents are now separated correctly.
+
+### Documentation consolidation
+
+- Rebuilt the governing build, design, architecture, data-engineering, scientific-model, API/plugin, CLI and validation contracts around the actual v1.0 platform.
+- Added a dedicated `ANALYSIS.md` contract and expanded statistics, vascular-mechanics, spectral/wave-analysis and plotting references with definitions, assumptions, failure conditions, CLI/API use and interpretation boundaries.
+- Replaced obsolete staged-PR Virtual Disease documentation with present-tense reconstruction, physics, runtime, public-interface and cohort qualification references.
+- Synchronized HEMOSPACE agent guidance, quantity ownership and endovascular protocols with the final `analysis → mechanics/spectral → stats → plot` research workflow.
+- Clarified that frozen qualification labels such as `METRICS_ONLY_THRESHOLDS_NOT_FROZEN` belong to their recorded evidence lineage and must not be generalized into an “unfinished platform” claim.
+- Upgraded parameterized-cohort/reconstruction documentation to distinguish current VascuQuest 1.0 capability from immutable revision-specific qualification evidence.
+- Preserved `docs/history/**` and machine-readable qualification evidence as historical/immutable records rather than rewriting them to match current release prose.
+- Added explicit documentation precedence and maintenance rules so future scientific/API changes must update their corresponding current documentation in the same development cycle.
 
 ### Release engineering
 
