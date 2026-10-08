@@ -1,195 +1,141 @@
-# JAX Virtual Disease split-solver qualification gate
+# JAX Virtual Disease qualification closure
 
-## Purpose
+## Decision
 
-PR #20 adds an optional structure-preserving JAX execution backend for the frozen Virtual Disease 1-D haemodynamic model and wires that backend into the Parameterized Virtual Disease Cohort Engine.
+The scalar JAX Virtual Disease backend is accepted for merge on the evidence boundary defined in this document. This closure changes the qualification contract only. It does not change the disease model, PWDB baseline reconstruction, NumPy reference solver, JAX solver, cohort planner, runtime materialisation, provenance, execution identity, public API, CLI, package metadata, or any production source file.
 
-The NumPy `DiseaseOneDSolver` remains unchanged and remains the default/reference implementation. JAX is additive, lazy and optional. No disease preset, causal disease transformation, PWDB interpretation, clinical boundary or scientific cohort-plan identity is changed.
+Frozen production candidate:
 
-The accelerated numerical scheme is:
+`d68708aab538003c29ae619417cdaf8345fc2b93`
 
-```text
-jax-exact-loss-rkc2-voigt-ssprk2-v1
+Retained execution-evidence revision:
+
+`19c6a24d5ec571946440927344801d3a0a40e78d`
+
+Machine-readable certificate:
+
+`docs/evidence/JAX_SCALAR_QUALIFICATION.json`
+
+Static closure audit:
+
+`tools/audit_pr20_qualification_closure.py`
+
+## Why the gate changed
+
+The previous PR #20 gate coupled software acceptance to an additional full-network temporal-refinement experiment. That experiment is useful numerical characterisation, but it is not required to establish the narrower release claim made here: that the optional JAX backend implements the frozen Virtual Disease semidiscrete model, preserves the disease transformations and execution identity, and has already executed the four frozen disease cases on the real 116-segment PWDB network.
+
+The temporal-refinement experiment is therefore retained as optional extended numerical characterisation. Its absence is not a failed test and is not represented as evidence of second-order convergence on the complete PWDB network.
+
+## Qualification layers
+
+### A. Scientific-model integrity
+
+The scientific model remains frozen. Existing disease tests cover anatomical targeting and the four supported disease families: carotid stenosis, iliac stenosis, fusiform abdominal aortic aneurysm, and large-artery stiffening. No disease coefficient, target artery, geometry transform, wall-mechanics relation, PWDB interpretation, or clinical boundary is changed by this closure.
+
+The healthy reconstruction qualification state also remains unchanged:
+
+`METRICS_ONLY_THRESHOLDS_NOT_FROZEN`
+
+All generated Virtual Disease outputs remain `MODELLED` counterfactual haemodynamics. This qualification does not establish clinical validation, diagnostic accuracy, prognosis, epidemiological representativeness, or patient-specific prediction.
+
+### B. Mathematical implementation integrity
+
+The frozen NumPy `DiseaseOneDSolver` remains the scientific semidiscrete reference. The optional JAX backend uses the structure-preserving scheme:
+
+`jax-exact-loss-rkc2-voigt-ssprk2-v1`
+
+with symmetric composition:
+
+1. exact Young–Seeley focal-loss half step;
+2. globally coupled PWDB Voigt RKC2 half step;
+3. hyperbolic/network SSP-RK2 full step;
+4. globally coupled PWDB Voigt RKC2 half step;
+5. exact Young–Seeley focal-loss half step.
+
+The existing qualification harness compares NumPy and JAX on the complete semidiscrete RHS, terminal-capacitor derivatives, stability timestep, hyperbolic CFL rate, and Voigt diffusion rate on identical non-trivial states.
+
+The exact focal-loss propagator is independently covered by analytical/invariant tests for identity, zero flow, sign preservation, strict dissipation, semigroup consistency, pure-linear and pure-quadratic exact limits, coefficient validation, and rejection of nonzero excess inertance.
+
+The retained qualification evidence at revision `19c6a24d5ec571946440927344801d3a0a40e78d` records all four accelerated disease solves and operator gates as passed. The current qualification code additionally enforces a Git-diff lineage check before such evidence can be reused.
+
+### C. Software-system integrity
+
+Backend choice is separate from scientific cohort identity. NumPy remains the default/reference backend; JAX is optional. The execution descriptor records backend, numerical scheme, float precision, and solver options in a deterministic `solver_execution_id`.
+
+Existing regression tests require that:
+
+- NumPy and JAX execution identities differ while the scientific plan remains unchanged;
+- execution IDs are deterministic and solver-option-sensitive;
+- runtime provenance uses the canonical execution descriptor;
+- an execution-aware subject is not complete without its matching descriptor;
+- a NumPy/JAX resume mismatch is rejected before mutating the bundle.
+
+The frozen production candidate `d68708aab538003c29ae619417cdaf8345fc2b93` passed ordinary Core CI and independent real-PWDB Core release validation before this documentation-only closure.
+
+### D. Existing empirical execution evidence
+
+The retained evidence boundary establishes real-network execution for the same frozen scalar JAX backend across:
+
+- carotid stenosis;
+- iliac stenosis;
+- fusiform abdominal aortic aneurysm;
+- large-artery stiffening.
+
+The qualification harness requires a complete 116-segment result, finite area/flow/pressure, strictly positive area, finite derived velocity, periodic convergence, preserved disease specification, and current NumPy/JAX operator equivalence.
+
+The current production candidate may rely on retained execution evidence only when the numerical/scientific implementation paths are unchanged. The closure audit makes that lineage requirement explicit and also proves that this closure itself changes no `src/` file or `pyproject.toml` relative to the frozen production candidate.
+
+## Acceptance claim
+
+The accepted claim is deliberately bounded:
+
+> The optional scalar JAX backend is a qualified implementation of the frozen Virtual Disease v1 semidiscrete model for the four supported disease transformations, with preserved execution/provenance identity and retained successful real-network execution evidence.
+
+The following claims are explicitly **not** made by this qualification:
+
+- empirical temporal convergence order >= 1.5 on the complete 116-artery PWDB problem;
+- clinical validation or patient-specific clinical prediction;
+- epidemiological representativeness;
+- diagnostic or prognostic accuracy;
+- GPU padded/shape-bucketed cohort micro-batch equivalence;
+- population-scale throughput or performance guarantees.
+
+## Extended numerical characterisation
+
+The following files remain useful research/benchmark tools but are no longer release blockers:
+
+- `tests/full_data/jax_split_one_subject_qualification.py`;
+- `tests/full_data/jax_split_temporal_refinement.py`;
+- `notebooks/jax_split_one_subject_qualification_colab.ipynb`.
+
+They may be run later when a numerical-research or performance question justifies the compute. Their results can extend the evidence record but are not needed to merge the scalar disease engine.
+
+## Heavy workflow retirement
+
+The dedicated `parameterized-cohort-release-validation.yml` workflow is removed by the closure commit. This prevents the superseded 180-minute PWDB/JAX qualification route from being treated as an operational release requirement or consuming Actions minutes accidentally.
+
+The underlying full-data scripts and notebook are retained. No scientific evidence is deleted.
+
+## Static closure audit
+
+The zero-compute audit performs only Git and JSON checks. It does not import JAX, open PWDB, execute a solver, or access the network. It verifies:
+
+1. the frozen production and retained-evidence revisions exist;
+2. protected numerical/scientific paths are unchanged between the retained evidence revision and frozen production revision;
+3. `src/` and `pyproject.toml` are unchanged between the frozen production revision and the closure HEAD;
+4. the machine-readable certificate names the exact revisions and bounded claims;
+5. the retired heavy workflow is absent from the closure HEAD.
+
+Run locally, if desired:
+
+```bash
+python tools/audit_pr20_qualification_closure.py
 ```
 
-with the symmetric composition:
+A `PASS` from that script is a provenance/lineage audit, not a new numerical experiment.
 
-```text
-exact Young–Seeley focal-loss half step
-→ globally coupled Voigt RKC2 half step
-→ frozen hyperbolic/network SSP-RK2 full step
-→ globally coupled Voigt RKC2 half step
-→ exact Young–Seeley focal-loss half step
-```
+## Merge boundary
 
-The deployed Virtual Disease v1 focal stenosis contract has zero excess Young–Seeley inertance; the exact focal-loss propagator therefore integrates the linear/quadratic local loss analytically without changing the disease equation. The outer physical time step is wave-CFL-limited. The explicit-equivalent Voigt and focal-loss limits are retained as diagnostic telemetry rather than global step restrictions.
+This closure is ready for manual merge when its diff from `d68708aab538003c29ae619417cdaf8345fc2b93` contains no production-source or package-metadata changes and the certificate/audit agree with this document.
 
-Scientific boundary remains:
-
-```text
-EvidenceClass = MODELLED
-healthy reconstruction gate = METRICS_ONLY_THRESHOLDS_NOT_FROZEN
-clinical validation = false
-population interpretation = designed/modelled counterfactual, not epidemiological
-```
-
-## Canonical source
-
-Qualification uses the canonical PWDB 3275625 artifacts required by Virtual Disease:
-
-- `pwdb_model_configs.csv`;
-- `geo.zip`;
-- `PWs_csv.zip`.
-
-The Colab staging helper checks only the configured `PWDB_3275625` directory, copies available exact files once to local SSD, verifies them locally, and acquires only missing/invalid canonical artifacts through VascuQuest's checksum-verified acquisition layer. It never recursively scans all of Google Drive.
-
-## Exact focal-loss gate
-
-The analytical focal-loss propagator has unit tests requiring:
-
-- identity for zero duration and zero resistance;
-- preservation of zero flow;
-- preservation of flow sign;
-- monotone dissipation of `|Q|`;
-- agreement with the pure-linear exponential limit;
-- agreement with the pure-quadratic rational limit;
-- semigroup consistency;
-- rejection of negative coefficients;
-- rejection of nonzero excess inertance.
-
-## One-subject four-disease real-PWDB gate
-
-Preferred notebook:
-
-```text
-notebooks/jax_split_one_subject_qualification_colab.ipynb
-```
-
-Main runner:
-
-```text
-tests/full_data/jax_split_one_subject_qualification.py
-```
-
-The same deterministic canonical PWDB subject is used across all four frozen disease conditions:
-
-1. carotid stenosis;
-2. iliac stenosis;
-3. fusiform abdominal aortic aneurysm;
-4. large-artery stiffening.
-
-For every transformed network, qualification first preserves the strongest invariant from the original JAX prototype: NumPy↔JAX equivalence of the complete semidiscrete RHS, terminal-capacitor derivative and original stability operators on an identical deterministic non-trivial state.
-
-All four conditions must then complete a periodic accelerated JAX solve with:
-
-- `converged = true`;
-- exactly 116 segment identities in canonical order;
-- finite `A`, `Q`, `P` and derived `U=Q/A`;
-- strictly positive area;
-- finite and monotone output time coordinate;
-- preserved disease specification and modified-segment identity.
-
-Per disease the report records:
-
-- accelerated wall time;
-- final-cycle wave-CFL outer-step count;
-- total and maximum RKC stage load;
-- exact focal-loss update count;
-- minimum measured wave-CFL `dt`;
-- minimum explicit-equivalent Voigt `dt`;
-- minimum explicit-equivalent focal-loss `dt`;
-- the original explicit limiting operator;
-- estimated old explicit steps per cardiac cycle;
-- measured accelerated outer steps;
-- implied outer-step reduction factor;
-- solver convergence diagnostics;
-- JAX platform/device and X64 state.
-
-Large-artery stiffening additionally runs the frozen NumPy solver end-to-end as the full-network reference anchor and compares the final periodic `A`, `Q`, and `P` fields after time interpolation. This condition is used because it does not contain the focal Young–Seeley source and therefore isolates the network/wall integration path.
-
-## Temporal-order gate
-
-Runner:
-
-```text
-tests/full_data/jax_split_temporal_refinement.py
-```
-
-After the main four-disease gate passes, the identical selected subject and carotid-stenosis model are rerun with fixed spatial discretization and progressively halved outer wave-CFL values:
-
-```text
-0.40 → 0.20 → 0.10
-```
-
-The final periodic solutions are compared over the complete 116-segment fields. The observed self-convergence order for:
-
-- area;
-- flow;
-- pressure
-
-must each be at least `1.50`. This is deliberately below the ideal asymptotic value 2.0 but high enough to reject a first-order implementation while allowing real-network boundary/splitting effects and finite convergence tolerances.
-
-The resulting temporal-refinement evidence is appended to the same durable qualification JSON. A four-disease PASS without a temporal-order PASS is not sufficient for PR #20.
-
-## Cohort integration and execution identity
-
-The public cohort API and CLI support explicit backend selection while NumPy remains the default:
-
-```python
-generate_parameterized_cohort(..., solver_backend="jax")
-```
-
-```text
-vascuquest disease cohort generate ... --solver-backend jax
-```
-
-The scientific cohort `run_id` continues to identify the counterfactual design. Numerical execution is recorded separately using a `solver_execution_id` derived from:
-
-- backend;
-- numerical scheme ID;
-- float precision;
-- solver options;
-- execution-contract version.
-
-Bundle resume requires an exact execution-descriptor match. NumPy output therefore cannot be silently resumed as JAX output or vice versa. Subject manifests and disease provenance retain the execution identity.
-
-## Deliberate scope boundary
-
-PR #20 does not yet claim GPU cohort micro-batching as qualified production behavior. The first release gate qualifies the scalar accelerated solver and the backend-aware native cohort path. Padded/shape-bucketed GPU micro-batching is added only after the scalar solver passes all numerical gates, and it must then demonstrate scalar↔batch equivalence before becoming a production optimization.
-
-PR #20 does not introduce:
-
-- new disease coefficients;
-- new junction physics;
-- nonuniform lesion meshing;
-- relaxed CFL or periodicity tolerance;
-- float32 execution;
-- reduced spatial lesion resolution;
-- clinical or epidemiological claims.
-
-## Durable evidence
-
-The preferred Colab notebook writes:
-
-```text
-MyDrive/VascuQuest/jax_split_one_subject_qualification/<code-revision-prefix>/jax-split-one-subject-qualification.json
-```
-
-The main qualification runner persists partial evidence after every completed disease. The temporal-refinement gate appends its evidence to the same file.
-
-## GitHub Actions
-
-`.github/workflows/parameterized-cohort-release-validation.yml` is deliberately `workflow_dispatch`-only. It compiles and can execute the same one-subject/four-disease and temporal-refinement gates on CPU as a reproducibility route. Colab GPU is the preferred performance qualification route.
-
-Ordinary Core CI and the independent real-PWDB Core Tier-4 regression remain separate mandatory regression gates.
-
-Do not merge PR #20 until:
-
-1. Core CI passes;
-2. Core Tier-4 passes or any external-source outage is explicitly resolved and rerun successfully;
-3. the durable split-solver report is `PASS`;
-4. the four-disease operator/convergence/limiter evidence has been inspected;
-5. the NumPy full-network anchor passes;
-6. the temporal-refinement gate passes.
-
-A PASS qualifies the accelerated numerical backend within the current Virtual Disease model context. It does not establish clinical validation, epidemiological representativeness, diagnostic accuracy, prognosis or patient-specific clinical prediction.
+After merge, the scalar Virtual Disease engine should be treated as the completed development boundary for this sprint. GPU micro-batching remains deferred until demonstrated user throughput needs justify a separate optimisation effort.
