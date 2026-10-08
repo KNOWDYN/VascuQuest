@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vascuquest"
-version = "0.1.0"
-description = "Scientific exploration and discovery for virtual vascular populations."
+version = "1.0.0"
+description = "In-silico vascular research platform for virtual cardiovascular populations."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.11,<3.15"
 license = "Apache-2.0"
@@ -16,6 +16,9 @@ keywords = [
     "scientific-computing",
     "vascular",
     "virtual-population",
+    "in-silico",
+    "arterial-mechanics",
+    "spectral-analysis",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -39,11 +42,21 @@ dependencies = [
 vascuquest = "vascuquest.cli.app:main"
 
 [project.optional-dependencies]
-jax = [
-    "jax>=0.5",
+jax = ["jax>=0.5"]
+path = ["h5py>=3.11,<4"]
+research = [
+    "scipy>=1.13,<2",
+    "PyWavelets>=1.7,<2",
 ]
-path = [
+plot = [
+    "matplotlib>=3.9,<4",
+]
+all = [
+    "jax>=0.5",
     "h5py>=3.11,<4",
+    "scipy>=1.13,<2",
+    "PyWavelets>=1.7,<2",
+    "matplotlib>=3.9,<4",
 ]
 dev = [
     "build>=1.2",
@@ -51,6 +64,9 @@ dev = [
     "pytest>=8",
     "pytest-cov>=5",
     "ruff>=0.12",
+    "scipy>=1.13,<2",
+    "PyWavelets>=1.7,<2",
+    "matplotlib>=3.9,<4",
 ]
 
 [project.urls]

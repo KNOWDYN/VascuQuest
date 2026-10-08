@@ -41,6 +41,11 @@ def test_frozen_command_tree_and_global_version() -> None:
         "export",
         "reproduce",
         "disease",
+        "hemospace",
+        "stats",
+        "mechanics",
+        "spectral",
+        "plot",
     ):
         assert name in result.output
 
@@ -61,7 +66,7 @@ def test_frozen_command_tree_and_global_version() -> None:
 
     version = runner.invoke(app, ["--version"])
     assert version.exit_code == 0
-    assert version.output.strip() == "0.1.0"
+    assert version.output.strip() == "1.0.0"
 
 
 def test_metadata_machine_output_is_clean_and_parseable() -> None:
