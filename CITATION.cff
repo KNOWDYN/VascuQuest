@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "If you use VascuQuest in research, please cite this software and the underlying PWDB dataset used by your analysis."
 title: "VascuQuest"
 type: software
-version: 0.1.0
-date-released: 2026-08-26
+version: 1.0.0
+date-released: 2026-10-08
 doi: "10.13140/RG.2.2.26784.96004"
 authors:
   - family-names: "Saqr"
@@ -17,4 +17,7 @@ keywords:
   - pulse wave
   - vascular
   - virtual population
+  - in-silico research
+  - arterial mechanics
+  - spectral analysis
   - scientific computing

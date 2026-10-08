@@ -1,240 +1,185 @@
 # VascuQuest
 
-**Scientific exploration and discovery for virtual vascular populations.**
+**In-silico vascular research platform for virtual cardiovascular populations.**
 
-[![Core CI](https://github.com/KNOWDYN/VascuQuest/actions/workflows/ci.yml/badge.svg)](https://github.com/KNOWDYN/VascuQuest/actions/workflows/ci.yml)
-[![Python 3.11–3.14](https://img.shields.io/badge/Python-3.11%E2%80%933.14-blue.svg)](https://www.python.org/)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-green.svg)](LICENSE)
-[![Version: 0.1.0](https://img.shields.io/badge/version-0.1.0-blue.svg)](CHANGELOG.md)
-[![VascuQuest DOI](https://img.shields.io/badge/DOI-10.13140%2FRG.2.2.26784.96004-blue.svg)](https://doi.org/10.13140/RG.2.2.26784.96004)
-[![PWDB source DOI](https://img.shields.io/badge/PWDB-10.5281%2Fzenodo.3275625-blue.svg)](https://doi.org/10.5281/zenodo.3275625)
+VascuQuest 1.0 is a Python package and CLI for provenance-aware cardiovascular research over the Pulse Wave DataBase (PWDB), qualified Virtual Disease models, and HEMOSPACE virtual cardiovascular records.
 
-VascuQuest is a Python package and command-line interface for **research-grade access to the Pulse Wave DataBase (PWDB)**. The canonical PWDB Zenodo record [`3275625`](https://zenodo.org/records/3275625) remains the upstream source of truth; VascuQuest provides a verified scientific interface around it.
+The canonical PWDB source remains Zenodo record `3275625` (DOI `10.5281/zenodo.3275625`). VascuQuest does not re-host or relicense PWDB.
 
-VascuQuest does **not** replace, re-host or silently modify PWDB. It adds explicit dataset identity, selective checksum-verified acquisition, stable quantity and location semantics, evidence classes, provenance, reproducible exports, and matching Python/CLI application flows.
+## What v1.0 adds
 
-> **Validated 0.1.0 scope:** scalar subject quantities, source-supported vascular geometry, common-site waveforms, validated volumetric-flow reconstruction, JSON/CSV export, provenance-aware reproduction and plugin inspection. Dense path-resolved waveforms are deliberately outside the 0.1.0 public capability set.
+VascuQuest began as a research-grade PWDB access layer. Version 1.0 retains that validated core and adds a complete in-silico research stack:
 
-## Why VascuQuest?
+- **HEMOSPACE** — comprehensive, provenance-aware Virtual Cardiovascular Records; phenotype-driven cohorts; qualified lazy dense-path access; explicit knowledge closure.
+- **Virtual Disease** — mechanistic carotid stenosis, iliac stenosis, fusiform abdominal-aortic aneurysm, and large-artery stiffening over preserved canonical virtual subjects.
+- **Qualified statistics** — subject-aligned descriptive, inferential, correlation, bootstrap and regression operations.
+- **Vascular mechanics** — pressure-area compliance, distensibility, strain, stiffness, Bramwell-Hill wave speed and pressure-area loop quantities.
+- **Spectral and wave analysis** — harmonics, PSD, coherence, pressure-flow impedance, characteristic-impedance estimates, wave separation, wave intensity, STFT, CWT and path-wise harmonic evolution.
+- **Scientific visualization** — declarative multi-panel figures, insets, large-cohort rendering and automatic collision-free exterior legends.
 
-PWDB contains 4,374 virtual haemodynamic simulation instances distributed across heterogeneous canonical files. A researcher who works directly with those files must otherwise solve source identification, acquisition, checksums, field naming, units, waveform locations, evidence status, provenance and reproducibility independently.
+A VascuQuest `VirtualSubject` is a simulation instance, **not a patient**. Virtual Disease outputs are mechanistic `MODELLED` quantities, not clinical predictions.
 
-VascuQuest turns the supported PWDB scope into one scientific interface while preserving the distinction between **source data** and **computed results**.
+## Scientific evidence remains explicit
 
-Typical questions include:
+Every scientific result is classified as one of:
 
-- Which virtual subjects satisfy a physiological or model condition?
-- Which canonical quantities are available for a subject or cohort?
-- What source waveform is available at a named vascular measurement site?
-- What geometry is associated with a virtual subject?
-- Was a result read from PWDB, reconstructed, derived, inferred or modelled?
-- Which exact source artifact, method, units and coordinates produced a result?
+- `SOURCE`
+- `RECONSTRUCTED`
+- `DERIVED`
+- `INFERRED`
+- `MODELLED`
 
-A VascuQuest `VirtualSubject` is a simulation instance, **not a patient**.
+Evidence status is separate from validity. Results retain dataset identity, quantity meaning, units, subject/cohort context, vascular location, method identity, warnings and provenance references.
 
-## Validated capability map
+## Core research workflow
 
-| Capability | Status | Canonical source / method |
-|---|---|---|
-| Dataset identity and capability inspection | **Available** | Packaged PWDB manifest |
-| Subject/model scalar access | **Available** | `pwdb_model_configs.csv` |
-| Haemodynamic parameters | **Available** | `pwdb_haemod_params.csv` |
-| Pulse-wave indices | **Available** | `pwdb_pw_indices.csv` |
-| Onset/fiducial timing quantities | **Available** | `pwdb_onset_times.csv` |
-| Subject-specific vascular geometry | **Available** | `geo.zip` |
-| Common-site `P`, `U`, `A`, `PPG` waveforms | **Available** | `PWs_csv.zip` |
-| Volumetric flow rate `Q` | **RECONSTRUCTED** | validated `Q = U*A` |
-| JSON result export | **Available** | VascuQuest result model |
-| CSV result export | **Available** | values + metadata sidecar |
-| Provenance-aware reproduction | **Available** | recorded dataset/result lineage |
-| Plugin discovery and inspection | **Available** | five explicit component categories |
-| Dense path-resolved waveforms | **Not in 0.1.0** | optional future capability |
+```python
+import vascuquest as vq
 
-## Scientific evidence stays visible
+session = vq.open_dataset(source="/path/to/pwdb", offline=True)
 
-VascuQuest uses five evidence classes:
+# Existing PWDB / HEMOSPACE / Virtual Disease operations remain unchanged.
+# New v1 analysis modules consume their ScientificResult objects directly:
+summary = vq.stats.describe(result)
+mechanics = vq.mechanics.area_distensibility(pressure_waveform, area_waveform)
+harmonics = vq.spectral.harmonic_amplitude(pressure_waveform, n_harmonics=10)
 
-- `SOURCE` — read from a supported canonical PWDB source representation;
-- `RECONSTRUCTED` — deterministically reconstructed from aligned source quantities;
-- `DERIVED` — produced by a declared scientific derivation;
-- `INFERRED` — produced by an inference/discovery method where scientifically warranted;
-- `MODELLED` — produced by an explicit research model/operator.
+figure = vq.plot.FigureSpec(
+    panels=(
+        vq.plot.PanelSpec(
+            "A",
+            layers=(vq.plot.LayerSpec("line", pressure_waveform, label="Pressure"),),
+        ),
+    )
+)
+vq.plot.render(figure, "figure.svg")
+```
 
-Evidence class is separate from validity. Material results carry provenance sufficient to identify source artifacts, quantities, units, coordinates and methods.
+## CLI
+
+The original dataset, disease and HEMOSPACE commands remain available. V1 adds:
+
+```text
+vascuquest stats ...
+vascuquest mechanics ...
+vascuquest spectral ...
+vascuquest plot ...
+```
+
+Examples:
+
+```bash
+vascuquest stats describe result.json
+vascuquest stats compare healthy.json disease.json --paired --method ttest
+vascuquest mechanics compute area_distensibility area.json --pressure pressure.json
+vascuquest spectral impedance pressure.json flow.json --harmonics 10
+vascuquest plot series pressure.json flow.json --output figure.svg
+```
+
+The analysis CLI consumes native JSON documents previously exported by VascuQuest. It does not silently reinterpret arbitrary CSV columns as scientific quantities.
 
 ## Installation
 
-VascuQuest 0.1.0 supports Python **3.11–3.14**.
-
-From a source checkout or source release:
+Core installation remains lightweight:
 
 ```bash
 python -m pip install .
 ```
 
-For development and tests:
+Research analysis:
 
 ```bash
-python -m pip install ".[dev]"
+python -m pip install ".[research]"
 ```
 
-The lightweight runtime depends on NumPy, platformdirs and Typer. Optional large-format readers are not imposed on the core installation merely because alternate PWDB representations exist.
-
-Verify the installation:
+Publication plotting:
 
 ```bash
-vascuquest --version
-vascuquest dataset info --format json
+python -m pip install ".[plot]"
 ```
 
-Importing VascuQuest does not automatically download PWDB artifacts.
-
-## First use
-
-Inspect local capability status:
+Everything:
 
 ```bash
-vascuquest dataset status --format json
+python -m pip install ".[all]"
 ```
 
-Register an existing directory containing canonical PWDB files:
+Python 3.11–3.14 is supported.
 
-```bash
-vascuquest dataset register /path/to/pwdb
-```
+## Architectural invariants
 
-Recognised artifacts are checked against the packaged canonical manifest before they are trusted.
+VascuQuest 1.0 follows one strict extension rule:
 
-Acquire one explicit artifact when needed:
+> New analysis functionality consumes existing VascuQuest scientific objects; it does not mutate the PWDB core, HEMOSPACE semantics, or qualified Virtual Disease physics.
 
-```bash
-vascuquest dataset acquire --artifact model_configurations --yes
-```
+Consequences:
 
-Acquisition is selective and checksum-verified; using VascuQuest does not imply downloading the complete PWDB archive.
+- `VirtualSubject` remains identity-centric.
+- HEMOSPACE remains the comprehensive phenotype/knowledge layer.
+- Virtual Disease physics and qualification are not modified by analysis modules.
+- Statistics never erase canonical subject alignment.
+- Mechanics and spectral operations never silently resample waveforms.
+- Plotting never becomes the scientific source of truth.
+- Large-cohort rendering may rasterize graphics but never silently drop observations.
+- Any aggregation, density estimation or transformation used for visualization is explicit in the figure specification.
+- Legends are always outside scientific axes and are placed with collision checks against axes, labels, titles, insets and neighboring panels.
 
-## Python example
+## Qualified v1 mechanics
 
-```python
-from pathlib import Path
-import vascuquest as vq
+The canonical pressure-area layer includes:
 
-session = vq.open_dataset(source=Path("/path/to/pwdb"), offline=True)
+- area strain;
+- equivalent-diameter strain;
+- area compliance;
+- area distensibility;
+- cycle-wise pressure-area slope;
+- Peterson modulus;
+- beta stiffness index;
+- Bramwell-Hill local wave-speed estimate;
+- signed pressure-area loop integral.
 
-age = session.get("age", subjects="1")
+These are **vascular mechanics**, not a claim that VascuQuest solves full fluid-structure interaction.
 
-pressure = session.waveform(
-    "pressure",
-    subject="1",
-    location=vq.MeasurementSite("AorticRoot"),
-)
+## Qualified v1 spectral/wave analysis
 
-flow_rate = session.derive(
-    "vascuquest:flow-rate-reconstruction",
-    subjects="1",
-    location=vq.MeasurementSite("AorticRoot"),
-)
-```
+The canonical spectral layer includes:
 
-The built-in flow-rate reconstruction computes volumetric flow rate from aligned source flow-velocity and luminal-area waveforms using `Q = U*A`. It returns `RECONSTRUCTED` evidence in `m^3/s`; it does not interpolate mismatched inputs or substitute unavailable path data.
+- harmonic amplitude and phase;
+- periodogram PSD;
+- magnitude-squared coherence;
+- pressure-flow input impedance;
+- explicit-range characteristic-impedance estimates;
+- pressure-flow wave separation with explicit `Zc`;
+- net/forward/backward wave-intensity rate with explicit wave speed;
+- STFT;
+- continuous wavelet transform when PyWavelets is installed;
+- path-wise harmonic evolution.
 
-## CLI example
+Native time coordinates must be uniformly sampled for spectral methods. VascuQuest fails rather than silently resampling.
 
-```bash
-vascuquest get age \
-  --subject 1 \
-  --source /path/to/pwdb \
-  --offline \
-  --format json
+## Validation philosophy
 
-vascuquest waveform pressure \
-  --subject 1 \
-  --location AorticRoot \
-  --source /path/to/pwdb \
-  --offline \
-  --format json
+V1 analysis qualification is intentionally inexpensive. It relies on deterministic synthetic signals and analytical identities rather than rerunning the expensive disease solver or downloading multi-gigabyte source artifacts merely to test algebra:
 
-vascuquest derive vascuquest:flow-rate-reconstruction \
-  --subject 1 \
-  --location AorticRoot \
-  --source /path/to/pwdb \
-  --offline \
-  --format json
-```
+- known statistical reference cases;
+- manufactured pressure-area cycles;
+- exact sinusoidal spectra and phases;
+- known pressure-flow impedance;
+- manufactured wave-intensity inputs;
+- deterministic plotting geometry and legend-collision assertions.
 
-The CLI is a thin adapter over the same application services used by the Python API. Machine-readable output is written to stdout; operational messages are kept on stderr.
-
-## Export and reproducibility
-
-VascuQuest exports scientific results rather than unlabeled arrays. JSON preserves structured metadata directly. CSV uses a mandatory metadata sidecar where the table cannot carry the complete scientific context.
-
-Strict reproduction fails rather than silently replacing an unavailable source or scientific method.
-
-## Validation
-
-The **core PWDB v1 scope passed real-source Tier-4 release validation**.
-
-The release-validation harness uses the exact six canonical artifacts required by the public 0.1.0 capability set:
-
-1. `pwdb_model_configs.csv`
-2. `pwdb_haemod_params.csv`
-3. `pwdb_pw_indices.csv`
-4. `pwdb_onset_times.csv`
-5. `geo.zip`
-6. `PWs_csv.zip`
-
-The recorded validation established, among other checks:
-
-- canonical checksums for all six claimed artifacts;
-- exact subject sequence/alignment across all 4,374 simulation identities in the scalar source tables;
-- six age groups of 729 subjects each;
-- complete inventory of all 4,374 geometry members;
-- complete inventory and subject alignment of all 52 declared common-site waveform members;
-- representative public-API waveform reads across the six source age groups;
-- real-source `Q = U*A` flow-rate reconstruction with `RECONSTRUCTED` evidence;
-- Python/CLI and packaging regression across the supported platform/Python matrix.
-
-Batch-8 separately demonstrated that canonical dense path data are ingestible from the real MATLAB-v7.3/HDF5 source. That experiment does **not** constitute a public path-resolved capability in 0.1.0.
-
-## Scope boundary
-
-VascuQuest 0.1.0 deliberately does not claim:
-
-- dense path-resolved PWDB waveform access;
-- validation against the complete 44.3 GB PWDB archive;
-- clinical interpretation of virtual subjects;
-- support for source representations or scientific methods that have not passed their own implementation and validation gates.
-
-A request for an unsupported capability fails explicitly; it is never silently remapped to a different vascular location or evidence class.
-
-## Citation
-
-For the software, cite **VascuQuest 0.1.0** using DOI [`10.13140/RG.2.2.26784.96004`](https://doi.org/10.13140/RG.2.2.26784.96004). The same identifier is recorded in [`CITATION.cff`](CITATION.cff) for citation-aware tools.
-
-Research using PWDB source data should also cite the canonical upstream dataset:
-
-- **Pulse Wave DataBase**, Zenodo record `3275625`, DOI [`10.5281/zenodo.3275625`](https://doi.org/10.5281/zenodo.3275625).
-
-The built-in flow-rate reconstruction records the authoritative PWDB article citation, DOI [`10.1152/ajpheart.00218.2019`](https://doi.org/10.1152/ajpheart.00218.2019).
-
-Do not replace the PWDB citation with the VascuQuest software citation when reporting research that uses the source dataset; they identify different scholarly objects.
-
-## Licence and data boundary
-
-VascuQuest software is distributed under the **Apache License 2.0**; see [`LICENSE`](LICENSE).
-
-PWDB is external data. VascuQuest does not bundle or re-host the canonical PWDB source artifacts and **does not relicense the source dataset**.
+The validated v0.1 PWDB core, HEMOSPACE path-reader contract qualification, and qualified Virtual Disease evidence remain separate upstream evidence chains.
 
 ## Documentation
 
-Detailed scientific and implementation contracts live under [`docs/`](docs/):
+- `docs/V1_RESEARCH_PLATFORM.md`
+- `docs/STATS.md`
+- `docs/VASCULAR_MECHANICS.md`
+- `docs/SPECTRAL_ANALYSIS.md`
+- `docs/PLOTTING.md`
+- `docs/HEMOSPACE.md`
+- `docs/VIRTUAL_DISEASE.md`
 
-- [`SCIENTIFIC_MODEL.md`](docs/SCIENTIFIC_MODEL.md) — quantities, locations, evidence and provenance;
-- [`DATA_ENGINEERING.md`](docs/DATA_ENGINEERING.md) — source identity, acquisition and integrity;
-- [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) — package architecture;
-- [`API_PLUGIN_CONTRACT.md`](docs/API_PLUGIN_CONTRACT.md) — Python API and plugin contracts;
-- [`CLI_CONTRACT.md`](docs/CLI_CONTRACT.md) — command-line contract;
-- [`TEST_VALIDATION_CONTRACT.md`](docs/TEST_VALIDATION_CONTRACT.md) — testing and release-validation rules;
-- [`BUILD_PLAN.md`](docs/BUILD_PLAN.md) — current development/release boundary.
+## Citation and licence
 
-Release-facing changes are recorded in [`CHANGELOG.md`](CHANGELOG.md).
+VascuQuest software is Apache-2.0 licensed. Cite VascuQuest with DOI `10.13140/RG.2.2.26784.96004` and cite PWDB separately whenever PWDB source data are used.
