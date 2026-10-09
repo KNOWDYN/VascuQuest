@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      - "README.md"
+      - "docs/*.md"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -32,6 +34,13 @@ jobs:
         run: |
           rm -rf "$RUNNER_TEMP/vascuquest-pages"
           cp -R site "$RUNNER_TEMP/vascuquest-pages"
+
+          # Package the repository Markdown documentation into the Pages origin so
+          # the VascuQuest documentation reader never needs to navigate to GitHub.
+          cp README.md "$RUNNER_TEMP/vascuquest-pages/README.md"
+          mkdir -p "$RUNNER_TEMP/vascuquest-pages/docs"
+          cp docs/*.md "$RUNNER_TEMP/vascuquest-pages/docs/"
+
           python - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET

@@ -2,256 +2,307 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#06111f">
-  <title>VascuQuest — Virtual Vascular Research for Endovascular R&D</title>
-  <meta name="description" content="Study vascular disease across 4,000+ virtual humans with mechanistic vascular disease models, arterial haemodynamics, mechanics and pulse-wave analysis.">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050a11">
+  <meta name="description" content="VascuQuest — population-scale in-silico vascular R&D across 4000+ virtual humans.">
+  <title>VascuQuest — Population-scale in-silico vascular R&D</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-2.css">
+  <link rel="stylesheet" href="styles-3.css">
+  <link rel="stylesheet" href="styles-4.css">
 </head>
 <body>
-<header class="topbar">
-  <a class="brand" href="#top">VASCUQUEST <span>1.0</span></a>
-  <nav>
-    <a href="#disease">Disease</a>
-    <a href="#haemodynamics">Haemodynamics</a>
-    <a href="#cohorts">Virtual humans</a>
-    <a href="#rd">R&amp;D fit</a>
-    <a class="github" href="https://github.com/KNOWDYN/VascuQuest" target="_blank" rel="noopener">GitHub ↗</a>
-  </nav>
-</header>
+  <div class="page-noise" aria-hidden="true"></div>
 
-<main id="top">
-<section class="hero">
-  <div class="hero-copy">
-    <div class="eyebrow"><span></span>Virtual vascular research platform</div>
-    <h1>Study vascular disease across <em>4,000+ virtual humans.</em></h1>
-    <p class="hero-lead">Model carotid stenosis, iliac stenosis, abdominal aortic aneurysm and large-artery stiffening across virtual cardiovascular cohorts. Measure pressure, flow, arterial mechanics and pulse-wave behaviour—subject by subject.</p>
-    <div class="hero-actions">
-      <a class="button button-primary" href="#haemodynamics">Explore haemodynamics <b>↘</b></a>
-      <a class="button button-secondary" href="#disease">Vascular disease models <b>→</b></a>
+  <header class="glass-header" id="siteHeader">
+    <a class="brand" href="#top" aria-label="VascuQuest home">
+      <span class="brand-name">VASCUQUEST</span>
+      <span class="brand-sub">In-silico vascular R&amp;D</span>
+    </a>
+    <nav class="nav-full" aria-label="Primary navigation">
+      <a href="#platform">Platform</a>
+      <a href="#applications">Applications</a>
+      <a href="#science">Science</a>
+      <a href="https://github.com/KNOWDYN/VascuQuest" target="_blank" rel="noreferrer">GitHub ↗</a>
+    </nav>
+    <a class="header-cta" href="#platform">Explore</a>
+    <button class="nav-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false">Menu</button>
+    <div class="nav-compact" hidden>
+      <a href="#platform">Platform</a>
+      <a href="#applications">Applications</a>
+      <a href="#science">Science</a>
+      <a href="https://github.com/KNOWDYN/VascuQuest" target="_blank" rel="noreferrer">GitHub ↗</a>
     </div>
-    <div class="proof-row">
-      <div><strong>4,374</strong><span>virtual cardiovascular systems</span></div>
-      <div><strong>116</strong><span>arterial segments</span></div>
-      <div><strong>4</strong><span>mechanistic disease models</span></div>
-    </div>
-  </div>
+  </header>
 
-  <div class="vascular-stage" id="vascularStage">
-    <img class="arterial-fallback" src="assets/Arterial_System.svg" alt="Arterial system">
-    <canvas id="vascularGL" aria-label="Interactive arterial system visualization"></canvas>
-    <div class="stage-vignette"></div>
-    <div class="stage-label">INTERACTIVE VASCULAR SYSTEM</div>
-
-    <button class="anatomy-hotspot active" data-disease="carotid" data-x="318" data-y="-360">
-      <i></i><span><b>Carotid stenosis</b><small>carotid circulation</small></span>
-    </button>
-    <button class="anatomy-hotspot" data-disease="stiffness" data-x="365" data-y="-10">
-      <i></i><span><b>Arterial stiffening</b><small>large arteries</small></span>
-    </button>
-    <button class="anatomy-hotspot" data-disease="aaa" data-x="365" data-y="345">
-      <i></i><span><b>Fusiform AAA</b><small>abdominal aorta</small></span>
-    </button>
-    <button class="anatomy-hotspot" data-disease="iliac" data-x="365" data-y="635">
-      <i></i><span><b>Iliac stenosis</b><small>iliac circulation</small></span>
-    </button>
-
-    <aside class="disease-readout" id="diseaseReadout">
-      <div class="readout-heading">
-        <small>SELECTED DISEASE MODEL</small>
-        <strong id="diseaseTitle">Carotid stenosis</strong>
+  <main>
+    <section class="hero scene" id="top" aria-labelledby="heroTitle">
+      <div class="hero-copy">
+        <p class="eyebrow">Population-scale vascular R&amp;D</p>
+        <h1 id="heroTitle">Test the population before you test the product.</h1>
+        <p class="hero-support">Population-scale in-silico vascular R&amp;D across <strong>4000+ virtual humans.</strong></p>
+        <a class="primary-action" href="#platform">Explore VascuQuest <span aria-hidden="true">→</span></a>
       </div>
-      <p id="diseaseDescription">Controlled carotid narrowing examined across matched virtual cardiovascular systems.</p>
-      <div class="readout-grid">
-        <span><small>PRESSURE</small><b>P(t)</b></span>
-        <span><small>FLOW</small><b>Q(t)</b></span>
-        <span><small>AREA</small><b>A(t)</b></span>
-        <span><small>ANALYSIS</small><b>Mechanics + waves</b></span>
+      <div class="hero-visual artery-stage" data-pulse="true" aria-hidden="true">
+        <div class="artery-aura"></div>
+        <img class="artery artery-base" data-artery alt="">
+        <img class="artery artery-pulse" data-artery alt="">
+        <div class="heart-origin"></div>
       </div>
-    </aside>
-    <div class="scene-note">Move pointer to explore · select a disease territory</div>
-  </div>
-</section>
+      <div class="hero-index" aria-hidden="true"><span>VASCULAR POPULATION</span><span>IN-SILICO R&amp;D</span></div>
+    </section>
 
-<section class="scope-strip" aria-label="Vascular research scope">
-  <span>VASCULAR RESEARCH SCOPE</span>
-  <b>Carotid disease</b>
-  <b>Iliac disease</b>
-  <b>Abdominal aortic aneurysm</b>
-  <b>Large-artery mechanics</b>
-</section>
-
-<section class="section light" id="disease">
-  <header class="section-heading">
-    <p>01 / VASCULAR DISEASE</p>
-    <div>
-      <h2>Four mechanistic disease models.<br>One cardiovascular population.</h2>
-      <p class="intro">Apply controlled vascular changes without losing the identity of the underlying virtual cardiovascular system.</p>
-    </div>
-  </header>
-
-  <div class="disease-spectrum">
-    <article>
-      <div class="territory carotid-territory"><img src="assets/Arterial_System.svg" alt=""></div>
-      <small>CAROTID CIRCULATION</small><h3>Carotid stenosis</h3>
-      <p>Controlled carotid narrowing for studying pressure, flow and pulsatile-wave response across matched subjects.</p>
-      <footer>Pressure · flow · wave behaviour</footer>
-    </article>
-    <article>
-      <div class="territory iliac-territory"><img src="assets/Arterial_System.svg" alt=""></div>
-      <small>ILIAC CIRCULATION</small><h3>Iliac stenosis</h3>
-      <p>Controlled iliac narrowing with downstream haemodynamic consequences across the virtual cohort.</p>
-      <footer>Peripheral haemodynamics</footer>
-    </article>
-    <article>
-      <div class="territory aaa-territory"><img src="assets/Arterial_System.svg" alt=""></div>
-      <small>ABDOMINAL AORTA</small><h3>Fusiform AAA</h3>
-      <p>Controlled aortic dilation for examining pressure–area mechanics, impedance and wave behaviour.</p>
-      <footer>Aortic mechanics · waves</footer>
-    </article>
-    <article>
-      <div class="territory stiff-territory"><img src="assets/Arterial_System.svg" alt=""></div>
-      <small>LARGE ARTERIES</small><h3>Arterial stiffening</h3>
-      <p>Controlled stiffening for studying pulse-wave propagation, pressure–area response and arterial mechanics.</p>
-      <footer>Compliance · PWV · impedance</footer>
-    </article>
-  </div>
-</section>
-
-<section class="section dark haemodynamics" id="haemodynamics">
-  <header class="section-heading">
-    <p>02 / HAEMODYNAMICS</p>
-    <div>
-      <h2>See what changes inside the artery.</h2>
-      <p class="intro">Compare the same virtual cardiovascular system before and after a controlled modelled disease state.</p>
-    </div>
-  </header>
-
-  <div class="lab-grid">
-    <div class="wave-monitor">
-      <div class="monitor-head">
-        <span><small>REFERENCE</small><b>Healthy virtual human</b></span>
-        <span class="modelled"><small>MODELLED DISEASE</small><b id="monitorDisease">Carotid stenosis</b></span>
+    <section class="population scene" id="platform" aria-labelledby="populationTitle">
+      <div class="population-copy">
+        <div class="population-number">4000+</div>
+        <div class="population-label">virtual humans</div>
+        <h2 id="populationTitle">One model shows a case.<br>VascuQuest explores a population.</h2>
       </div>
-      <div class="signal" data-signal="pressure"><label>ARTERIAL PRESSURE&nbsp; P(t)</label><canvas></canvas></div>
-      <div class="signal" data-signal="flow"><label>VOLUMETRIC FLOW&nbsp; Q(t)</label><canvas></canvas></div>
-      <div class="signal" data-signal="area"><label>LUMINAL AREA&nbsp; A(t)</label><canvas></canvas></div>
-      <div class="monitor-foot">
-        <span>Compliance <b>derived</b></span><span>Distensibility <b>derived</b></span>
-        <span>Impedance <b>derived</b></span><span>Wave intensity <b>derived</b></span>
+      <div class="population-field" id="populationField" aria-hidden="true"></div>
+    </section>
+
+    <section class="difference scene" id="difference" aria-labelledby="differenceTitle">
+      <div class="difference-visual" id="differenceVisual" aria-hidden="true">
+        <div class="single-subject">
+          <img class="subject-base" data-artery alt="">
+          <img class="subject-focus" data-artery alt="">
+        </div>
+        <div class="case-field" id="caseField"></div>
       </div>
-      <div class="preview-note">Interface preview: traces are demonstrative, not scientific results.</div>
-    </div>
-    <div class="lab-copy">
-      <div class="micro-title">SAME SUBJECT · SAME ARTERIAL SITE</div>
-      <h3>Pressure. Flow. Area.<br>Mechanics. Waves.</h3>
-      <p>VascuQuest keeps haemodynamic measurements tied to cardiovascular identity, arterial location, evidence class and method provenance.</p>
-      <dl>
-        <div><dt>Pressure–area mechanics</dt><dd>compliance · distensibility · stiffness</dd></div>
-        <div><dt>Pressure–flow analysis</dt><dd>impedance · harmonics · coherence</dd></div>
-        <div><dt>Wave behaviour</dt><dd>separation · reflection · intensity</dd></div>
-        <div><dt>Comparison design</dt><dd>healthy ↔ disease · paired subject</dd></div>
-      </dl>
-    </div>
-  </div>
-</section>
 
-<section class="section light cohorts" id="cohorts">
-  <header class="section-heading">
-    <p>03 / VIRTUAL HUMANS</p>
-    <div>
-      <h2>The same vascular disease meets 4,374 different cardiovascular contexts.</h2>
-      <p class="intro">Study variation in pressure, heart rate, stroke volume, pulse-wave velocity, vessel diameter and other physiological design variables across a controlled virtual population.</p>
-    </div>
-  </header>
+      <div class="difference-copy">
+        <div class="difference-tabs" role="tablist" aria-label="VascuQuest advantages">
+          <button role="tab" aria-selected="true" data-state="paired">Paired disease</button>
+          <button role="tab" aria-selected="false" data-state="system">Whole-system</button>
+          <button role="tab" aria-selected="false" data-state="priority">Prioritisation</button>
+          <button role="tab" aria-selected="false" data-state="scale">Population scale</button>
+        </div>
 
-  <div class="cohort-grid">
-    <div class="cohort-copy">
-      <div class="big-number">4,374</div>
-      <h3>virtual cardiovascular systems</h3>
-      <p>Select a cohort, apply one controlled disease definition, then inspect how haemodynamic and mechanical responses differ across matched subjects.</p>
-      <div class="variable-cloud">
-        <span><b>MBP</b> mean blood pressure</span><span><b>HR</b> heart rate</span>
-        <span><b>SV</b> stroke volume</span><span><b>PWV</b> pulse-wave velocity</span>
-        <span><b>DIA</b> diameter</span><span><b>LEN</b> arterial length</span>
-        <span><b>LVET</b> ejection time</span><span><b>PVC</b> vascular state</span>
+        <div class="difference-message" data-panel="paired">
+          <h2 id="differenceTitle">Same virtual human.<br>Controlled disease change.</h2>
+          <p>Paired vascular experimentation.</p>
+          <div class="binary-control" role="group" aria-label="Vascular state">
+            <button type="button" class="is-active" data-disease="healthy">Healthy</button>
+            <button type="button" data-disease="disease">Disease</button>
+          </div>
+        </div>
+        <div class="difference-message" data-panel="system" hidden>
+          <h2>Local vascular challenge.<br>Whole-system context.</h2>
+          <div class="territory-control" role="group" aria-label="Vascular territory">
+            <button type="button" class="is-active" data-territory="carotid">Carotid</button>
+            <button type="button" data-territory="aorta">Aorta</button>
+            <button type="button" data-territory="iliac">Iliac</button>
+          </div>
+        </div>
+        <div class="difference-message" data-panel="priority" hidden>
+          <h2>Find the cases worth testing.</h2>
+          <p>Surface relevant variation before downstream development.</p>
+        </div>
+        <div class="difference-message" data-panel="scale" hidden>
+          <h2>From one vascular model<br>to 4000+ virtual humans.</h2>
+        </div>
+      </div>
+    </section>
+
+    <section class="applications scene" id="applications" aria-labelledby="applicationsTitle">
+      <div class="applications-backdrop" aria-hidden="true">
+        <img data-artery alt=""><img data-artery alt=""><img data-artery alt="">
+      </div>
+      <div class="applications-heading">
+        <h2 id="applicationsTitle">Move vascular R&amp;D upstream.</h2>
+      </div>
+      <div class="application-selector" role="tablist" aria-label="Commercial applications">
+        <button role="tab" aria-selected="true" data-app="trials">In-silico trials</button>
+        <button role="tab" aria-selected="false" data-app="evr">Personalised EVR</button>
+        <button role="tab" aria-selected="false" data-app="therapeutics">Therapeutics</button>
+      </div>
+      <div class="application-zones">
+        <article data-app-panel="trials" class="application-zone is-active">
+          <h3>In-silico trials</h3>
+          <p>Explore vascular populations before expensive physical studies.</p>
+          <a href="#pipeline">Explore virtual trials →</a>
+        </article>
+        <article data-app-panel="evr" class="application-zone">
+          <h3>Personalised EVR</h3>
+          <p>Investigate where physiological variability may change device or treatment requirements.</p>
+          <a href="#pipeline">Explore personalised EVR →</a>
+        </article>
+        <article data-app-panel="therapeutics" class="application-zone">
+          <h3>Next-generation therapeutics</h3>
+          <p>Identify vascular states worth deeper therapeutic investigation.</p>
+          <a href="#pipeline">Explore therapeutic R&amp;D →</a>
+        </article>
+      </div>
+    </section>
+
+    <section class="pipeline scene" id="pipeline" aria-labelledby="pipelineTitle">
+      <div class="workflow-heading">
+        <h2 id="pipelineTitle">Find the vascular cases worth testing.</h2>
+        <p>Move from population exploration to the few cases that deserve expensive downstream development.</p>
+      </div>
+
+      <div class="fluid-flowchart" id="workflowMap" aria-label="VascuQuest to downstream development workflow">
+        <svg class="flowchart-lines" id="flowchartLines" aria-hidden="true" preserveAspectRatio="none">
+          <path class="flow-path-base" id="flowPathBase"></path>
+          <path class="flow-path-active" id="flowPathActive"></path>
+        </svg>
+
+        <article class="flow-step owned" data-step="population" data-flow-point>
+          <div class="flow-symbol" aria-hidden="true">
+            <svg viewBox="0 0 96 96" role="presentation">
+              <circle cx="48" cy="27" r="8"></circle><path d="M34 64c1-15 7-23 14-23s13 8 14 23"></path>
+              <circle cx="24" cy="36" r="6"></circle><path d="M14 68c1-12 4-20 10-20s10 8 11 20"></path>
+              <circle cx="72" cy="36" r="6"></circle><path d="M61 68c1-12 5-20 11-20s9 8 10 20"></path>
+            </svg>
+          </div>
+          <div class="flow-copy"><span>01 · VascuQuest</span><strong>Virtual population</strong><small>4000+ virtual humans</small></div>
+        </article>
+
+        <article class="flow-step owned" data-step="challenge" data-flow-point>
+          <div class="flow-symbol" aria-hidden="true">
+            <svg viewBox="0 0 96 96" role="presentation">
+              <path d="M13 25h21c8 0 11 8 14 16 3-8 6-16 14-16h21"></path>
+              <path d="M13 71h21c8 0 11-8 14-16 3 8 6 16 14 16h21"></path>
+              <circle cx="48" cy="48" r="8"></circle><circle cx="48" cy="48" r="19" class="soft"></circle>
+            </svg>
+          </div>
+          <div class="flow-copy"><span>02 · VascuQuest</span><strong>Vascular challenge</strong><small>Controlled model state</small></div>
+        </article>
+
+        <article class="flow-step owned" data-step="cases" data-flow-point>
+          <div class="flow-symbol" aria-hidden="true">
+            <svg viewBox="0 0 96 96" role="presentation">
+              <circle cx="21" cy="21" r="4"></circle><circle cx="38" cy="21" r="4"></circle><circle cx="55" cy="21" r="4"></circle><circle cx="72" cy="21" r="4"></circle>
+              <path d="M14 33h68L58 57v17l-20 8V57z"></path><circle cx="48" cy="47" r="4" class="accent-fill"></circle>
+            </svg>
+          </div>
+          <div class="flow-copy"><span>03 · VascuQuest</span><strong>Relevant cases</strong><small>Prioritised for follow-up</small></div>
+        </article>
+
+        <div class="flow-gate" data-flow-point aria-label="VascuQuest handoff">
+          <span class="gate-mark" aria-hidden="true"></span><small>HANDOFF</small>
+        </div>
+
+        <article class="flow-step downstream" data-step="simulation" data-flow-point>
+          <div class="flow-symbol" aria-hidden="true">
+            <svg viewBox="0 0 96 96" role="presentation">
+              <path d="M19 30 48 15l29 15v36L48 81 19 66z"></path><path d="m19 30 29 16 29-16M48 46v35M33 23l29 16M33 73l29-16"></path>
+            </svg>
+          </div>
+          <div class="flow-copy"><span>04 · Downstream</span><strong>Device simulation</strong><small>Device-specific modelling</small></div>
+        </article>
+
+        <article class="flow-step downstream" data-step="bench" data-flow-point>
+          <div class="flow-symbol" aria-hidden="true">
+            <svg viewBox="0 0 96 96" role="presentation">
+              <path d="M22 28c-11 7-11 33 0 40h52c11-7 11-33 0-40z"></path><path d="M22 48h52"></path>
+              <rect x="17" y="39" width="8" height="18" rx="2"></rect><rect x="71" y="39" width="8" height="18" rx="2"></rect>
+            </svg>
+          </div>
+          <div class="flow-copy"><span>05 · Downstream</span><strong>Bench</strong><small>Physical verification</small></div>
+        </article>
+
+        <article class="flow-step downstream" data-step="preclinical" data-flow-point>
+          <div class="flow-symbol" aria-hidden="true">
+            <svg viewBox="0 0 96 96" role="presentation">
+              <path d="M36 17h24M42 17v21L25 68c-3 6 1 11 8 11h30c7 0 11-5 8-11L54 38V17"></path>
+              <path d="M32 61h32"></path><path d="m40 61 6 6 12-15" class="accent"></path>
+            </svg>
+          </div>
+          <div class="flow-copy"><span>06 · Downstream</span><strong>Preclinical</strong><small>Translational validation</small></div>
+        </article>
+
+        <article class="flow-step downstream" data-step="clinical" data-flow-point>
+          <div class="flow-symbol" aria-hidden="true">
+            <svg viewBox="0 0 96 96" role="presentation">
+              <circle cx="48" cy="27" r="8"></circle><path d="M34 67c1-17 7-26 14-26s13 9 14 26"></path>
+              <circle cx="24" cy="38" r="6"></circle><path d="M14 70c1-13 4-21 10-21s10 8 11 21"></path>
+              <circle cx="72" cy="38" r="6"></circle><path d="M61 70c1-13 5-21 11-21s9 8 10 21"></path><path d="m68 24 5 5 10-12" class="accent"></path>
+            </svg>
+          </div>
+          <div class="flow-copy"><span>07 · Downstream</span><strong>Clinical</strong><small>Clinical development</small></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="science scene" id="science" aria-labelledby="scienceTitle">
+      <div class="science-visual" aria-hidden="true">
+        <img data-artery alt="">
+      </div>
+      <div class="science-copy">
+        <h2 id="scienceTitle">Built on cardiovascular mechanics.</h2>
+        <p>116-segment arterial network · pressure · flow · area · vascular mechanics · mechanistic disease models</p>
+        <button class="doc-inline-link" type="button" data-doc="docs/SCIENTIFIC_MODEL.md">View the science →</button>
+        <small>Virtual humans are simulation instances. Disease states are mechanistically modelled. Research software; not for clinical use.</small>
+      </div>
+    </section>
+
+    <section class="final-cta scene" aria-labelledby="finalTitle">
+      <div class="final-visual artery-stage" data-pulse="true" aria-hidden="true">
+        <div class="artery-aura"></div>
+        <img class="artery artery-base" data-artery alt="">
+        <img class="artery artery-pulse" data-artery alt="">
+        <div class="heart-origin"></div>
+      </div>
+      <div class="final-copy">
+        <h2 id="finalTitle">What would you test<br>across 4000+ virtual humans?</h2>
+        <p>Bring population-scale vascular exploration upstream in your next device, trial or therapeutic programme.</p>
+        <div class="final-actions">
+          <a class="primary-action" href="#platform">Explore VascuQuest <span aria-hidden="true">→</span></a>
+          <a class="text-action" href="https://github.com/KNOWDYN/VascuQuest" target="_blank" rel="noreferrer">GitHub ↗</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <section class="doc-drawer" id="docDrawer" aria-live="polite" aria-hidden="true">
+    <div class="doc-drawer-shell">
+      <div class="doc-drawer-head">
+        <div>
+          <span class="doc-kicker">VascuQuest documentation</span>
+          <h2 id="docTitle">Documentation</h2>
+        </div>
+        <button class="doc-close" id="docClose" type="button" aria-label="Close documentation">Close</button>
+      </div>
+      <div class="doc-meta" id="docMeta"></div>
+      <article class="markdown-view" id="docContent" tabindex="0"></article>
+    </div>
+  </section>
+
+  <footer class="mega-footer" id="documentation">
+    <div class="footer-intro">
+      <span>Documentation</span>
+      <p>Open the core VascuQuest Markdown documentation without leaving the platform.</p>
+    </div>
+    <div class="footer-grid">
+      <div class="footer-column">
+        <h3>Platform</h3>
+        <button class="doc-link" type="button" data-doc="README.md">Platform Overview</button>
+        <button class="doc-link" type="button" data-doc="docs/V1_RESEARCH_PLATFORM.md">Research Workflows</button>
+      </div>
+      <div class="footer-column">
+        <h3>Science</h3>
+        <button class="doc-link" type="button" data-doc="docs/SCIENTIFIC_MODEL.md">Scientific Model</button>
+        <button class="doc-link" type="button" data-doc="docs/VASCULAR_MECHANICS.md">Vascular Mechanics</button>
+      </div>
+      <div class="footer-column">
+        <h3>Virtual systems</h3>
+        <button class="doc-link" type="button" data-doc="docs/VIRTUAL_DISEASE.md">Virtual Disease Models</button>
+        <button class="doc-link" type="button" data-doc="docs/HEMOSPACE.md">HEMOSPACE Records</button>
+      </div>
+      <div class="footer-column">
+        <h3>Engineering</h3>
+        <button class="doc-link" type="button" data-doc="docs/ANALYSIS.md">Analysis Framework</button>
+        <button class="doc-link" type="button" data-doc="docs/ARCHITECTURE.md">Platform Architecture</button>
       </div>
     </div>
-    <div class="population-field">
-      <canvas id="populationCanvas"></canvas>
-      <div class="field-caption"><b>VIRTUAL COHORT</b><span>each point = one canonical virtual system</span></div>
+    <div class="footer-base">
+      <span>VascuQuest 1.0</span>
+      <span>Research software · Not for clinical use</span>
+      <span>KNOWDYN · © 2026</span>
     </div>
-  </div>
-</section>
+  </footer>
 
-<section class="section white measures">
-  <header class="section-heading">
-    <p>04 / WHAT VASCUQUEST MEASURES</p>
-    <div><h2>Built around vascular quantities researchers already use.</h2></div>
-  </header>
-  <div class="measure-columns">
-    <article><span>HAEMODYNAMICS</span><h3>Pressure &amp; flow</h3>
-      <ul><li>Arterial pressure waveform</li><li>Blood velocity waveform</li><li>Volumetric flow waveform</li><li>Luminal area waveform</li><li>Pulse pressure</li></ul>
-    </article>
-    <article><span>VASCULAR MECHANICS</span><h3>Arterial wall response</h3>
-      <ul><li>Area and diameter strain</li><li>Compliance</li><li>Distensibility</li><li>Pressure–area relationship</li><li>Peterson modulus / beta stiffness</li></ul>
-    </article>
-    <article><span>PULSE-WAVE ANALYSIS</span><h3>Wave behaviour</h3>
-      <ul><li>Pressure–flow impedance</li><li>Characteristic impedance</li><li>Harmonics</li><li>Wave separation and reflection</li><li>Wave intensity / coherence</li></ul>
-    </article>
-  </div>
-</section>
-
-<section class="section dark" id="rd">
-  <header class="section-heading">
-    <p>05 / ENDOVASCULAR R&amp;D</p>
-    <div>
-      <h2>Screen vascular physiology before expensive device-specific testing.</h2>
-      <p class="intro">VascuQuest is an upstream research layer. It helps structure which vascular conditions deserve deeper device-specific computation and physical investigation.</p>
-    </div>
-  </header>
-  <div class="pipeline">
-    <div class="vq"><small>VASCUQUEST</small><b>Virtual cardiovascular cohort</b><span>physiology · subject identity</span></div>
-    <i>→</i>
-    <div class="vq"><small>VASCUQUEST</small><b>Disease + haemodynamics</b><span>pressure · flow · mechanics · waves</span></div>
-    <i>→</i>
-    <div><small>DOWNSTREAM</small><b>Device-specific CFD / FEA</b><span>selected cases and anatomy</span></div>
-    <i>→</i>
-    <div><small>DOWNSTREAM</small><b>Bench / preclinical</b><span>physical test programmes</span></div>
-  </div>
-</section>
-
-<section class="section evidence" id="evidence">
-  <header class="section-heading">
-    <p>06 / SCIENTIFIC IDENTITY</p>
-    <div>
-      <h2>Every result knows what it is—and where it came from.</h2>
-      <p class="intro">Source physiology, modelled disease, derived mechanics and statistical inference remain explicitly distinguishable.</p>
-    </div>
-  </header>
-  <div class="evidence-ledger">
-    <div><span>SOURCE</span><b>PWDB pressure / velocity / area</b><code>dataset identity</code></div>
-    <div><span>RECONSTRUCTED</span><b>Qualified reconstructed quantity</b><code>method + provenance</code></div>
-    <div><span>MODELLED</span><b>Virtual Disease output</b><code>mechanistic disease</code></div>
-    <div><span>DERIVED</span><b>Mechanics / spectral / wave quantity</b><code>method_id</code></div>
-    <div><span>INFERRED</span><b>Qualified statistical result</b><code>aligned subjects</code></div>
-  </div>
-</section>
-
-<section class="boundary">
-  <h2>Medical relevance.<br><em>Scientific restraint.</em></h2>
-  <div>
-    <p>VascuQuest is research software. Disease states are mechanistic and MODELLED. A virtual human is a virtual cardiovascular simulation instance—not a patient.</p>
-    <div class="boundary-tags"><span>No clinical prediction</span><span>No patient digital twin</span><span>No device-deployment simulation</span><span>No regulatory qualification claim</span></div>
-  </div>
-</section>
-</main>
-
-<footer>
-  <div><strong>VASCUQUEST</strong><p>In-silico vascular research for virtual cardiovascular populations.</p></div>
-  <div class="footer-links"><a href="#disease">Disease models</a><a href="#haemodynamics">Haemodynamics</a><a href="#cohorts">Virtual humans</a><a href="https://github.com/KNOWDYN/VascuQuest" target="_blank" rel="noopener">GitHub ↗</a></div>
-  <small>VascuQuest 1.0 · Software DOI 10.13140/RG.2.2.26784.96004 · PWDB DOI 10.5281/zenodo.3275625</small>
-</footer>
-<script src="app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

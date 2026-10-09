@@ -1,185 +1,262 @@
-(() => {
-  const stage = document.getElementById('vascularStage');
-  const canvas = document.getElementById('vascularGL');
-  const gl = canvas.getContext('webgl2', {antialias:true, alpha:true});
-  const VIEW = {x:-136.862,y:-576.555,w:1000,h:2000};
-  const TEX_ASPECT = VIEW.w / VIEW.h;
-  const hotspots = [...document.querySelectorAll('.anatomy-hotspot')];
-  const readout = document.getElementById('diseaseReadout');
-  const diseases = {
-    carotid:{title:'Carotid stenosis',desc:'Controlled carotid narrowing examined across matched virtual cardiovascular systems.',uv:[.455,.108]},
-    stiffness:{title:'Large-artery stiffening',desc:'Controlled stiffness change for studying pulse-wave propagation, pressure and arterial mechanics.',uv:[.502,.283]},
-    aaa:{title:'Fusiform abdominal aortic aneurysm',desc:'Controlled aortic dilation for examining pressure–area mechanics, impedance and wave behaviour.',uv:[.502,.461]},
-    iliac:{title:'Iliac stenosis',desc:'Controlled iliac narrowing with downstream pressure, flow and pulsatile-wave consequences.',uv:[.502,.606]}
-  };
-  let selected='carotid', mx=0, my=0, targetMx=0, targetMy=0, start=performance.now();
-  let scaleX=1, scaleY=1;
+const ASSET_URL = 'assets/Arterial_System.svg';
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 
-  const root = document.documentElement;
-  const topbar = document.querySelector('.topbar');
-  const hero = document.querySelector('.hero');
-  const heroCopy = document.querySelector('.hero-copy');
+$$('[data-artery]').forEach(img => { img.src = ASSET_URL; });
 
-  function clamp(n,a,b){ return Math.max(a,Math.min(b,n)); }
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const header = $('#siteHeader');
+const navToggle = $('.nav-toggle');
+const navCompact = $('.nav-compact');
 
-  // Continuous layout engine: derives geometry from actual rendered containers, not device classes.
-  function solvePageGeometry(){
-    const headerH = topbar.getBoundingClientRect().height;
-    root.style.setProperty('--header-h', `${headerH}px`);
+function fontPx(el){ return parseFloat(getComputedStyle(el).fontSize) || 16; }
+function clampNum(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function textMeasure(text, el){
+  const c=textMeasure.canvas || (textMeasure.canvas=document.createElement('canvas'));
+  const ctx=c.getContext('2d'); const cs=getComputedStyle(el);
+  ctx.font=`${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return ctx.measureText(text).width;
+}
+function setHeaderMode(){
+  const w=header.getBoundingClientRect().width;
+  const brandName=$('.brand-name'), brandSub=$('.brand-sub'), cta=$('.header-cta');
+  const navLinks=$$('.nav-full a');
+  const brandFull=textMeasure(brandName.textContent,brandName)+textMeasure(brandSub.textContent,brandSub)+34;
+  const brandCompact=textMeasure(brandName.textContent,brandName)+10;
+  const navNeed=navLinks.reduce((a,l)=>a+textMeasure(l.textContent,l),0)+Math.max(54,navLinks.length*24);
+  const ctaNeed=textMeasure(cta.textContent,cta)+52;
+  const chrome=clampNum(w*.07,44,112);
+  if(w >= brandFull+navNeed+ctaNeed+chrome){ header.dataset.navMode='full'; navCompact.hidden=true; navToggle.setAttribute('aria-expanded','false'); }
+  else if(w >= brandCompact+navNeed+ctaNeed+chrome*.7){ header.dataset.navMode='compact'; navCompact.hidden=true; navToggle.setAttribute('aria-expanded','false'); }
+  else { header.dataset.navMode='menu'; }
+}
+navToggle?.addEventListener('click',()=>{ const open=navToggle.getAttribute('aria-expanded')==='true'; navToggle.setAttribute('aria-expanded',String(!open)); navCompact.hidden=open; });
+$$('.nav-compact a').forEach(a=>a.addEventListener('click',()=>{navCompact.hidden=true;navToggle.setAttribute('aria-expanded','false')}));
 
-    const sr = stage.getBoundingClientRect();
-    if(sr.width > 0){
-      // Scene height is a continuous function of its own width and available viewport height.
-      const desired = sr.width / .76;
-      const available = Math.max(1, innerHeight - headerH);
-      const h = Math.min(desired, available * .86);
-      stage.style.setProperty('--stage-h', `${h}px`);
-    }
-
-    // Content-fit solver: if the headline is being squeezed while the scene sits beside it,
-    // recompose vertically. This uses rendered content geometry, not a viewport-width preset.
-    const h1 = heroCopy.querySelector('h1');
-    const hs = getComputedStyle(h1);
-    const fontSize = parseFloat(hs.fontSize) || 1;
-    const heroStyle=getComputedStyle(hero);
-    const innerW=hero.clientWidth-parseFloat(heroStyle.paddingLeft)-parseFloat(heroStyle.paddingRight);
-    const gap=parseFloat(heroStyle.columnGap||heroStyle.gap)||0;
-    // Required widths scale from the current fluid headline typography, so the decision
-    // follows content density rather than any named device/viewport size.
-    const copyNeed=fontSize*6.35;
-    const sceneNeed=fontSize*5.95;
-    const shouldRecompose=innerW < copyNeed + sceneNeed + gap;
-    if(hero.classList.contains('hero-recompose') !== shouldRecompose){
-      hero.classList.toggle('hero-recompose',shouldRecompose);
-      requestAnimationFrame(solvePageGeometry);
-    }
-
-    document.querySelectorAll('.section,.hero,.boundary,body > footer').forEach(el=>{
-      const r=el.getBoundingClientRect();
-      el.style.setProperty('--cw', `${r.width}px`);
-      el.style.setProperty('--ch', `${r.height}px`);
-      el.style.setProperty('--car', String(r.width / Math.max(r.height,1)));
-    });
-  }
-
-  function currentAssetRect(){
-    const r=stage.getBoundingClientRect();
-    const boxAspect=r.width/Math.max(r.height,1);
-    if(boxAspect > TEX_ASPECT){ scaleX=TEX_ASPECT/boxAspect*.94; scaleY=.94; }
-    else{ scaleX=.94; scaleY=boxAspect/TEX_ASPECT*.94; }
-    const w=r.width*scaleX, h=r.height*scaleY;
-    const shiftX=mx*.018*r.width*.5, shiftY=-my*.012*r.height*.5;
-    return {x:(r.width-w)/2+shiftX,y:(r.height-h)/2+shiftY,w,h,stageW:r.width,stageH:r.height};
-  }
-
-  function boxesOverlap(a,b){return !(a.right<b.left||a.left>b.right||a.bottom<b.top||a.top>b.bottom)}
-
-  function placeHotspots(){
-    const a=currentAssetRect();
-    hotspots.forEach(h=>{
-      h.classList.remove('flip','compact');
-      const sx=+h.dataset.x, sy=+h.dataset.y;
-      const u=(sx-VIEW.x)/VIEW.w, v=(sy-VIEW.y)/VIEW.h;
-      const left=a.x+u*a.w, top=a.y+v*a.h;
-      h.style.left=`${left}px`; h.style.top=`${top}px`;
-      if(left > a.stageW*.63) h.classList.add('flip');
-    });
-
-    // Collision decisions use actual rendered boxes, never viewport-size presets.
-    const sr=stage.getBoundingClientRect();
-    const rr=readout.getBoundingClientRect();
-    hotspots.forEach(h=>{
-      let br=h.getBoundingClientRect();
-      if(br.right>sr.right-6 || br.left<sr.left+6){ h.classList.toggle('flip',!h.classList.contains('flip')); br=h.getBoundingClientRect(); }
-      if(boxesOverlap(br,rr) || br.right>sr.right-6 || br.left<sr.left+6) h.classList.add('compact');
-    });
-  }
-
-  function positionReadout(){
-    // Keep the selected anatomical focus and the readout in opposite vertical zones.
-    readout.classList.toggle('readout-top', diseases[selected].uv[1] > .48);
-  }
-
-  const pageObserver = new ResizeObserver(()=>{solvePageGeometry();placeHotspots()});
-  [document.body,topbar,hero,heroCopy,stage].forEach(el=>pageObserver.observe(el));
-  solvePageGeometry();positionReadout();
-
-  if(gl){
-    const vs=`#version 300 es
-      in vec2 a_position; out vec2 v_uv;
-      uniform vec2 u_parallax; uniform vec2 u_scale;
-      void main(){
-        vec2 p=a_position*u_scale + u_parallax;
-        v_uv=vec2(a_position.x*.5+.5, 1.0-(a_position.y*.5+.5));
-        gl_Position=vec4(p,0.,1.);
-      }`;
-    const fs=`#version 300 es
-      precision highp float; in vec2 v_uv; out vec4 outColor;
-      uniform sampler2D u_tex; uniform float u_time; uniform vec2 u_focus;
-      void main(){
-        vec4 t=texture(u_tex,v_uv);
-        float red=max(t.r-t.g*.55-t.b*.45,0.);
-        float pulse=pow(max(0.,sin((v_uv.y*9.0-u_time*.75)*6.283)),18.0)*red;
-        float d=distance(v_uv,u_focus);
-        float focus=exp(-d*d*180.0);
-        vec3 arterial=t.rgb*(1.0+red*.42)+vec3(1.0,.23,.12)*pulse*1.7+vec3(.95,.18,.10)*focus*red*2.0;
-        float vignette=smoothstep(.78,.22,distance(v_uv,vec2(.5,.48)));
-        vec3 bg=vec3(.018,.055,.10)+vec3(.015,.05,.10)*vignette;
-        float a=max(t.a*.96,red*.9);
-        outColor=vec4(mix(bg,arterial,a),1.0);
-      }`;
-    const compile=(type,src)=>{const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);return s};
-    const prog=gl.createProgram();gl.attachShader(prog,compile(gl.VERTEX_SHADER,vs));gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,fs));gl.linkProgram(prog);gl.useProgram(prog);
-    const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
-    const pos=gl.getAttribLocation(prog,'a_position');gl.enableVertexAttribArray(pos);gl.vertexAttribPointer(pos,2,gl.FLOAT,false,0,0);
-    const uTime=gl.getUniformLocation(prog,'u_time'),uFocus=gl.getUniformLocation(prog,'u_focus'),uParallax=gl.getUniformLocation(prog,'u_parallax'),uScale=gl.getUniformLocation(prog,'u_scale');
-    const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-    const img=new Image();
-    img.onload=()=>{gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);stage.classList.add('webgl-ready');requestAnimationFrame(draw)};
-    img.src='assets/Arterial_System.svg';
-
-    function resizeGL(){
-      const dpr=Math.min(devicePixelRatio||1,2),r=stage.getBoundingClientRect();
-      const w=Math.max(1,Math.round(r.width*dpr)),h=Math.max(1,Math.round(r.height*dpr));
-      if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h)}
-      currentAssetRect();
-    }
-    new ResizeObserver(()=>{resizeGL();placeHotspots()}).observe(stage);resizeGL();
-    stage.addEventListener('pointermove',e=>{const r=stage.getBoundingClientRect();targetMx=(e.clientX-r.left)/r.width-.5;targetMy=(e.clientY-r.top)/r.height-.5});
-    stage.addEventListener('pointerleave',()=>{targetMx=0;targetMy=0});
-    function draw(now){
-      resizeGL();mx+=(targetMx-mx)*.035;my+=(targetMy-my)*.035;currentAssetRect();placeHotspots();
-      gl.uniform1f(uTime,(now-start)/1000);gl.uniform2fv(uFocus,diseases[selected].uv);gl.uniform2f(uParallax,mx*.018,-my*.012);gl.uniform2f(uScale,scaleX,scaleY);
-      gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(draw);
-    }
-  }
-
-  hotspots.forEach(h=>h.addEventListener('click',()=>{
-    selected=h.dataset.disease;
-    hotspots.forEach(x=>x.classList.toggle('active',x===h));
-    document.getElementById('diseaseTitle').textContent=diseases[selected].title;
-    document.getElementById('diseaseDescription').textContent=diseases[selected].desc;
-    document.getElementById('monitorDisease').textContent=diseases[selected].title;
-    positionReadout();placeHotspots();
-  }));
-
-  document.querySelectorAll('.signal canvas').forEach(c=>{
-    const wrap=c.parentElement,kind=wrap.dataset.signal,ctx=c.getContext('2d');
-    function f(t,disease=false){
-      if(kind==='pressure')return .47+.22*Math.sin(t*6.283-.35)+.07*Math.sin(t*12.566+.55)+(disease?.035*Math.sin(t*6.283+.9):0);
-      if(kind==='flow')return .45+.28*Math.sin(t*6.283-.6)+.09*Math.sin(t*12.566+.25)+(disease?.055*Math.sin(t*18.849+1):0);
-      return .48+.12*Math.sin(t*6.283-.15)+.03*Math.sin(t*12.566+.42)+(disease?-.025*Math.sin(t*6.283+.8):0)
-    }
-    function render(){
-      const r=wrap.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);c.width=Math.max(1,r.width*d);c.height=Math.max(1,r.height*d);const W=c.width,H=c.height;ctx.clearRect(0,0,W,H);
-      ctx.strokeStyle='rgba(160,195,225,.10)';ctx.lineWidth=1;for(let i=1;i<6;i++){ctx.beginPath();ctx.moveTo(W*i/6,0);ctx.lineTo(W*i/6,H);ctx.stroke()}
-      [[false,'rgba(92,226,241,.95)'],[true,'rgba(255,117,104,.95)']].forEach(([disease,col])=>{ctx.beginPath();for(let x=0;x<W;x++){const t=x/(W-1),y=H*(.88-f(t,disease));x?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.strokeStyle=col;ctx.lineWidth=Math.max(2,(devicePixelRatio||1)*1.3);ctx.stroke()});
-    }
-    new ResizeObserver(render).observe(wrap);render();
+function sceneFit(el, copyEl, opts={}){
+  const r=el.getBoundingClientRect();
+  const copyFont=fontPx(copyEl);
+  const copyNeed=clampNum(copyFont*(opts.copyChars||7.5), opts.copyMin||280, opts.copyMax||900);
+  const visualNeed=clampNum(r.height*(opts.visualWidthFromHeight||.42), opts.visualMin||260, opts.visualMax||760);
+  const gap=clampNum(copyFont*(opts.gapEm||.75),24,110);
+  const need=copyNeed+visualNeed+gap;
+  const ratio=r.width/Math.max(r.height,1);
+  if(r.width >= need*1.13 && ratio >= (opts.expandedRatio||1.12)) return 'expanded';
+  if(r.width >= need*.92 && ratio >= (opts.compactRatio||.88)) return 'compact';
+  return 'flow';
+}
+function applicationMode(){
+  const el=$('.applications'), r=el.getBoundingClientRect();
+  const titles=$$('.application-zone h3');
+  const minZone=Math.max(...titles.map(t=>clampNum(fontPx(t)*6.8,260,390)));
+  const gaps=clampNum(r.width*.045,36,110);
+  return r.width >= minZone*3+gaps ? 'expanded' : 'flow';
+}
+function drawFlowPath(){
+  const map=$('#workflowMap'), svg=$('#flowchartLines'), base=$('#flowPathBase'), active=$('#flowPathActive');
+  if(!map||!svg||!base||!active)return;
+  const mr=map.getBoundingClientRect();
+  const points=$$('[data-flow-point]',map).map(el=>{
+    const target=el.classList.contains('flow-step')?$('.flow-symbol',el):$('.gate-mark',el);
+    const r=(target||el).getBoundingClientRect();
+    return {x:r.left-mr.left+r.width/2,y:r.top-mr.top+r.height/2};
   });
+  if(points.length<2)return;
+  svg.setAttribute('viewBox',`0 0 ${Math.max(1,mr.width)} ${Math.max(1,mr.height)}`);
+  let d=`M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+  const vertical=map.dataset.flowMode==='vertical';
+  for(let i=1;i<points.length;i++){
+    const a=points[i-1],b=points[i];
+    if(vertical){
+      const my=(a.y+b.y)/2;
+      d+=` C ${a.x.toFixed(2)} ${my.toFixed(2)}, ${b.x.toFixed(2)} ${my.toFixed(2)}, ${b.x.toFixed(2)} ${b.y.toFixed(2)}`;
+    }else{
+      const mx=(a.x+b.x)/2;
+      d+=` C ${mx.toFixed(2)} ${a.y.toFixed(2)}, ${mx.toFixed(2)} ${b.y.toFixed(2)}, ${b.x.toFixed(2)} ${b.y.toFixed(2)}`;
+    }
+  }
+  base.setAttribute('d',d);active.setAttribute('d',d);
+}
+function workflowMode(){
+  const map=$('#workflowMap'); if(!map) return;
+  const r=map.getBoundingClientRect();
+  const steps=$$('.flow-step',map);
+  const widest=Math.max(...steps.map(s=>Math.max(textMeasure($('.flow-copy strong',s).textContent,$('.flow-copy strong',s)),92)));
+  const gate=clampNum(r.width*.038,44,70);
+  const gap=clampNum(r.width*.018,18,46);
+  const horizontalNeed=steps.length*Math.max(118,widest*.78)+gate+gap*steps.length;
+  map.dataset.flowMode=r.width>=horizontalNeed?'horizontal':'vertical';
+  requestAnimationFrame(drawFlowPath);
+}
+function footerMode(){
+  const footer=$('.mega-footer'), grid=$('.footer-grid');
+  const w=grid.getBoundingClientRect().width;
+  const buttons=$$('.doc-link',grid);
+  const longest=Math.max(...buttons.map(b=>textMeasure(b.textContent,b)))+clampNum(w*.035,34,70);
+  if(w/4 >= longest) footer.dataset.footerMode='four';
+  else if(w/2 >= longest) footer.dataset.footerMode='two';
+  else footer.dataset.footerMode='one';
+}
+function solveLayout(){
+  const hero=$('.hero'); hero.dataset.mode=sceneFit(hero,$('.hero h1'),{copyChars:7.2,copyMin:360,copyMax:880,visualWidthFromHeight:.43,visualMin:300,visualMax:620,expandedRatio:1.05});
+  const hr=hero.getBoundingClientRect();
+  const extra=Math.max(0,hr.width-hr.height*1.72); const heroRight=clampNum(5.2+(extra/Math.max(hr.width,1))*26,3.2,13.5); hero.style.setProperty('--hero-right',`${heroRight}vi`);
 
-  const pc=document.getElementById('populationCanvas'),pctx=pc.getContext('2d'),pf=pc.parentElement;
-  const frac=x=>x-Math.floor(x),hash=(i,k)=>frac(Math.sin(i*12.9898+k*78.233)*43758.5453);
-  function drawPop(){const r=pf.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);pc.width=Math.max(1,r.width*d);pc.height=Math.max(1,r.height*d);const W=pc.width,H=pc.height;pctx.clearRect(0,0,W,H);for(let i=1;i<=4374;i++){const x=.06+.88*((hash(i,1)+hash(i+11,2)+hash(i+31,3))/3),y=.07+.86*((hash(i,4)+hash(i+17,5)+hash(i+47,6))/3),hot=i%31<5;pctx.beginPath();pctx.arc(x*W,y*H,(hot?1.55:1.0)*d,0,Math.PI*2);pctx.fillStyle=hot?'rgba(210,72,59,.55)':'rgba(45,101,146,.28)';pctx.fill()}}
-  new ResizeObserver(drawPop).observe(pf);drawPop();
-})();
+  const pop=$('.population'); pop.dataset.mode=sceneFit(pop,$('.population h2'),{copyChars:7,copyMin:300,copyMax:650,visualWidthFromHeight:.47,visualMin:360,visualMax:780,expandedRatio:.94});
+  const diff=$('.difference'); diff.dataset.mode=sceneFit(diff,$('.difference-message:not([hidden]) h2')||$('.difference-message h2'),{copyChars:6.2,copyMin:310,copyMax:620,visualWidthFromHeight:.48,visualMin:330,visualMax:700,expandedRatio:.93});
+  const apps=$('.applications'); apps.dataset.mode=applicationMode();
+  const pipe=$('.pipeline'); pipe.dataset.mode=sceneFit(pipe,$('.workflow-heading h2'),{copyChars:7.5,copyMin:350,copyMax:760,visualWidthFromHeight:.30,visualMin:280,visualMax:580,expandedRatio:.88});
+  workflowMode();
+  const science=$('.science'); science.dataset.mode=sceneFit(science,$('.science-copy h2'),{copyChars:6.4,copyMin:320,copyMax:650,visualWidthFromHeight:.32,visualMin:240,visualMax:470,expandedRatio:.9});
+  const final=$('.final-cta'); final.dataset.mode=sceneFit(final,$('.final-copy h2'),{copyChars:7.8,copyMin:360,copyMax:900,visualWidthFromHeight:.40,visualMin:280,visualMax:560,expandedRatio:.92});
+  footerMode(); setHeaderMode();
+}
+let solveRAF=0;
+const scheduleSolve=()=>{cancelAnimationFrame(solveRAF);solveRAF=requestAnimationFrame(solveLayout)};
+new ResizeObserver(scheduleSolve).observe(document.body);
+window.visualViewport?.addEventListener('resize', scheduleSolve);
+window.addEventListener('resize', scheduleSolve,{passive:true});
+solveLayout();
+
+window.addEventListener('scroll',()=>header.classList.toggle('scrolled',scrollY>24),{passive:true});
+
+// Physiological pulse: a warm radial front originates near the heart and travels outward at 72 bpm.
+const pulseStages = $$('[data-pulse="true"]');
+function pulseFrame(t){
+  if(!reducedMotion){
+    const phase=(t%833)/833;
+    let p,alpha;
+    if(phase<.67){ p=phase/.67; alpha=1; }
+    else { p=1; alpha=Math.max(0,1-(phase-.67)/.33); }
+    const radius = 7 + p*128;
+    const width = 7 + p*5;
+    const inner = Math.max(0,radius-width);
+    const outer = Math.min(145,radius+width);
+    const mask=`radial-gradient(ellipse 88% 58% at 50% 31%, transparent 0 ${inner}%, rgba(0,0,0,${Math.min(1,alpha*1.2)}) ${radius}%, transparent ${outer}%)`;
+    pulseStages.forEach(stage=>{
+      const layer=$('.artery-pulse',stage); if(!layer)return;
+      layer.style.webkitMaskImage=mask; layer.style.maskImage=mask; layer.style.opacity=String(.18+.78*alpha);
+      const heart=$('.heart-origin',stage); if(heart) heart.style.opacity=String(.12+.72*Math.max(0,1-phase*3.8));
+    });
+  }
+  requestAnimationFrame(pulseFrame);
+}
+requestAnimationFrame(pulseFrame);
+
+// Population fields — structural multiplicity only; no quantitative distribution implied.
+const popLayout=[
+  [69,5,.57,.20,.55],[84,10,.48,.16,.5],[52,8,.66,.25,.62],[37,16,.78,.32,.68],[72,22,.74,.28,.66],[91,29,.55,.18,.55],
+  [58,34,.88,.45,.78],[42,42,.9,.45,.78],[77,43,.82,.36,.7],[25,48,.72,.30,.66],[91,54,.66,.23,.6],[61,58,1.0,.64,.9],
+  [43,66,.9,.43,.76],[78,69,.82,.35,.7],[24,73,.68,.27,.62],[89,78,.56,.19,.55],[57,82,.8,.34,.69],[38,86,.63,.22,.58],
+  [72,89,.62,.22,.57],[14,88,.53,.17,.52],[96,88,.45,.14,.48]
+];
+function buildPopulation(container, layout=popLayout, caseMode=false){
+  if(!container)return;
+  container.innerHTML='';
+  layout.forEach((v,i)=>{
+    const d=document.createElement('div'); d.className=caseMode?'case-subject':'pop-subject';
+    if(caseMode && [4,7,10].includes(i)) d.classList.add('selected');
+    d.style.setProperty('--x',`${v[0]}%`);d.style.setProperty('--y',`${v[1]}%`);d.style.setProperty('--s',v[2]);d.style.setProperty('--o',v[3]);d.style.setProperty(caseMode?'--br':'--b',v[4]);
+    const img=document.createElement('img');img.src=ASSET_URL;img.alt='';d.appendChild(img);container.appendChild(d);
+  });
+}
+buildPopulation($('#populationField'));
+const caseLayout=[[8,3,.72,.24,.58],[33,0,.88,.3,.65],[60,2,.72,.24,.58],[79,9,.66,.22,.56],[18,30,.85,.32,.7],[44,26,.98,.4,.8],[69,31,.83,.3,.68],[5,57,.7,.24,.58],[30,55,.92,.38,.72],[56,57,.9,.34,.7],[78,57,.8,.3,.66],[20,78,.72,.23,.58],[49,78,.78,.26,.6],[73,80,.67,.21,.55]];
+buildPopulation($('#caseField'),caseLayout,true);
+
+// Differentiation state machine.
+const diffVisual=$('#differenceVisual');
+const diffTabs=$$('.difference-tabs [data-state]');
+const diffPanels=$$('.difference-message');
+const focus=$('.subject-focus',diffVisual);
+let territory='carotid';
+const territoryMap={carotid:['49%','13%'],aorta:['50%','43%'],iliac:['50%','61%']};
+function applyTerritory(name){ territory=name; const [x,y]=territoryMap[name]; focus.style.setProperty('--fx',x);focus.style.setProperty('--fy',y); $$('.territory-control button').forEach(b=>b.classList.toggle('is-active',b.dataset.territory===name)); }
+function setDiffState(state){
+  diffTabs.forEach(b=>b.setAttribute('aria-selected',String(b.dataset.state===state)));
+  diffPanels.forEach(p=>p.hidden=p.dataset.panel!==state);
+  diffVisual.className='difference-visual';
+  if(state==='paired' && $('.binary-control [data-disease="disease"]').classList.contains('is-active')) diffVisual.classList.add('is-disease');
+  if(state==='system'){diffVisual.classList.add('is-system');applyTerritory(territory)}
+  if(state==='priority')diffVisual.classList.add('is-priority');
+  if(state==='scale')diffVisual.classList.add('is-scale');
+}
+diffTabs.forEach(b=>b.addEventListener('click',()=>setDiffState(b.dataset.state)));
+$$('.binary-control [data-disease]').forEach(b=>b.addEventListener('click',()=>{
+  $$('.binary-control [data-disease]').forEach(x=>x.classList.toggle('is-active',x===b));
+  diffVisual.classList.toggle('is-disease',b.dataset.disease==='disease');
+  if(b.dataset.disease==='disease'){focus.style.setProperty('--fx','50%');focus.style.setProperty('--fy','43%')}
+}));
+$$('.territory-control [data-territory]').forEach(b=>b.addEventListener('click',()=>applyTerritory(b.dataset.territory)));
+
+// Applications: simultaneous on wide screens, one active state when fit requires flow.
+const appButtons=$$('.application-selector [data-app]');
+const appPanels=$$('[data-app-panel]');
+function setApp(name){appButtons.forEach(b=>b.setAttribute('aria-selected',String(b.dataset.app===name)));appPanels.forEach(p=>p.classList.toggle('is-active',p.dataset.appPanel===name));}
+appButtons.forEach(b=>b.addEventListener('click',()=>setApp(b.dataset.app)));
+
+
+
+// In-site Markdown documentation tray. Footer links never navigate away from VascuQuest.
+const DOC_BASE='./';
+const DOC_NAMES={
+  'README.md':'Platform Overview',
+  'docs/V1_RESEARCH_PLATFORM.md':'Research Workflows',
+  'docs/SCIENTIFIC_MODEL.md':'Scientific Model',
+  'docs/VASCULAR_MECHANICS.md':'Vascular Mechanics',
+  'docs/VIRTUAL_DISEASE.md':'Virtual Disease Models',
+  'docs/HEMOSPACE.md':'HEMOSPACE Records',
+  'docs/ANALYSIS.md':'Analysis Framework',
+  'docs/ARCHITECTURE.md':'Platform Architecture'
+};
+const docDrawer=$('#docDrawer'), docTitle=$('#docTitle'), docMeta=$('#docMeta'), docContent=$('#docContent'), docClose=$('#docClose');
+const docCache=new Map(); let currentDoc='';
+function esc(s){return String(s).replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function resolveDocLink(href,base){
+  if(/^https?:/i.test(href)||href.startsWith('#')) return href;
+  if(!href.endsWith('.md')) return href;
+  const root=base.includes('/')?base.slice(0,base.lastIndexOf('/')+1):'';
+  const parts=(root+href).split('/'); const out=[];
+  for(const p of parts){if(p==='..')out.pop();else if(p!=='.'&&p)out.push(p)}
+  return out.join('/');
+}
+function inlineMD(t,base){
+  let x=esc(t);
+  x=x.replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/\*([^*]+)\*/g,'<em>$1</em>');
+  x=x.replace(/\[([^\]]+)\]\(([^)]+)\)/g,(m,label,href)=>{const resolved=resolveDocLink(href,base);if(resolved.endsWith('.md')&&!/^https?:/i.test(resolved))return `<a href="#documentation" data-doc-inline="${esc(resolved)}">${label}</a>`;return `<a href="${esc(resolved)}" target="_blank" rel="noreferrer">${label}</a>`});
+  return x;
+}
+function renderMarkdown(md,base){
+  const lines=md.replace(/\r/g,'').split('\n'); let html='',inCode=false,code=[],list=null;
+  const closeList=()=>{if(list){html+=`</${list}>`;list=null}};
+  for(const raw of lines){
+    if(raw.startsWith('```')){closeList();if(!inCode){inCode=true;code=[]}else{html+=`<pre><code>${esc(code.join('\n'))}</code></pre>`;inCode=false}continue}
+    if(inCode){code.push(raw);continue}
+    if(!raw.trim()){closeList();continue}
+    const h=raw.match(/^(#{1,3})\s+(.*)$/);if(h){closeList();const n=h[1].length;html+=`<h${n}>${inlineMD(h[2],base)}</h${n}>`;continue}
+    if(raw.startsWith('> ')){closeList();html+=`<blockquote>${inlineMD(raw.slice(2),base)}</blockquote>`;continue}
+    const ul=raw.match(/^[-*]\s+(.*)$/);if(ul){if(list!=='ul'){closeList();html+='<ul>';list='ul'}html+=`<li>${inlineMD(ul[1],base)}</li>`;continue}
+    const ol=raw.match(/^\d+\.\s+(.*)$/);if(ol){if(list!=='ol'){closeList();html+='<ol>';list='ol'}html+=`<li>${inlineMD(ol[1],base)}</li>`;continue}
+    closeList();html+=`<p>${inlineMD(raw,base)}</p>`;
+  }
+  closeList(); if(inCode) html+=`<pre><code>${esc(code.join('\n'))}</code></pre>`; return html;
+}
+async function openDoc(path){
+  currentDoc=path; docDrawer.classList.add('is-open'); docDrawer.setAttribute('aria-hidden','false');
+  docTitle.textContent=DOC_NAMES[path]||path.split('/').pop().replace('.md','').replaceAll('_',' ');
+  docMeta.textContent=path+' · rendered inside VascuQuest'; docContent.innerHTML='<p>Loading documentation…</p>';
+  requestAnimationFrame(()=>docDrawer.scrollIntoView({behavior:reducedMotion?'auto':'smooth',block:'start'}));
+  try{
+    let md=docCache.get(path); if(!md){const r=await fetch(DOC_BASE+path,{cache:'force-cache'});if(!r.ok)throw new Error('HTTP '+r.status);md=await r.text();docCache.set(path,md)}
+    if(currentDoc!==path)return; docContent.innerHTML=renderMarkdown(md,path); docContent.scrollTop=0; docContent.focus({preventScroll:true});
+  }catch(err){
+    docContent.innerHTML=`<h2>${esc(DOC_NAMES[path]||path)}</h2><p>This preview could not retrieve the Markdown source. The production build will serve the same repository Markdown inside this container rather than navigating to GitHub.</p><p><code>${esc(path)}</code></p>`;
+  }
+}
+function closeDoc(){docDrawer.classList.remove('is-open');docDrawer.setAttribute('aria-hidden','true');currentDoc='';}
+$$('[data-doc]').forEach(b=>b.addEventListener('click',()=>openDoc(b.dataset.doc)));
+docClose?.addEventListener('click',closeDoc);
+docContent?.addEventListener('click',e=>{const a=e.target.closest('[data-doc-inline]');if(a){e.preventDefault();openDoc(a.dataset.docInline)}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&docDrawer.classList.contains('is-open'))closeDoc()});
+
+window.addEventListener('load',()=>requestAnimationFrame(drawFlowPath));
