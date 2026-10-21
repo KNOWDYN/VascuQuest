@@ -10,7 +10,7 @@ import typer
 from vascuquest.hemospace.api import open_hemospace
 
 from .certificate import certify_lift
-from .core import lift_path
+from .source import lift_hemospace_path
 
 
 kinematics_app = typer.Typer(
@@ -46,8 +46,7 @@ def lift_command(
 ) -> None:
     """Reconstruct and export the exact axisymmetric velocity/vorticity field."""
     hs = open_hemospace(source=source, offline=offline)
-    waves = hs.path_waves(subject, path_name, signals=("U", "A"))
-    field = lift_path(waves, radial_points=radial_points)
+    field = lift_hemospace_path(hs, subject, path_name, radial_points=radial_points)
     time_s = _time_vector(field.mean_velocity_m_s.shape[1], sample_period_s)
     certificate = certify_lift(field, time_s=time_s)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -77,8 +76,7 @@ def certify_command(
 ) -> None:
     """Run the independent numerical certificate without exporting the field."""
     hs = open_hemospace(source=source, offline=offline)
-    waves = hs.path_waves(subject, path_name, signals=("U", "A"))
-    field = lift_path(waves, radial_points=radial_points)
+    field = lift_hemospace_path(hs, subject, path_name, radial_points=radial_points)
     time_s = _time_vector(field.mean_velocity_m_s.shape[1], sample_period_s)
     certificate = certify_lift(field, time_s=time_s)
     typer.echo(json.dumps(_payload(field, certificate, None), sort_keys=True))
