@@ -16,6 +16,7 @@ from vascuquest.errors import (
 from vascuquest.hemospace.cli import hemospace_app
 from vascuquest.stats.cli import stats_app
 from vascuquest.mechanics.cli import mechanics_app
+from vascuquest.kinematics.cli import kinematics_app
 from vascuquest.spectral.cli import spectral_app
 from vascuquest.plot.cli import plot_app
 
@@ -49,6 +50,7 @@ app.add_typer(disease_app, name="disease")
 app.add_typer(hemospace_app, name="hemospace")
 app.add_typer(stats_app, name="stats")
 app.add_typer(mechanics_app, name="mechanics")
+app.add_typer(kinematics_app, name="kinematics")
 app.add_typer(spectral_app, name="spectral")
 app.add_typer(plot_app, name="plot")
 
