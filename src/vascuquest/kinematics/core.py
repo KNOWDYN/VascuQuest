@@ -29,6 +29,12 @@ def _readonly(values: object) -> np.ndarray:
     return result
 
 
+def _readonly_bool(values: object) -> np.ndarray:
+    result = np.asarray(values, dtype=bool).copy()
+    result.setflags(write=False)
+    return result
+
+
 def _path_time(values: object, name: str, n_path: int) -> np.ndarray:
     result = np.asarray(values, dtype=float)
     if result.ndim == 1:
@@ -64,6 +70,7 @@ class WallVorticityResult:
     azimuthal_vorticity_s_1: np.ndarray
     axial_shear_contribution_s_1: np.ndarray
     radial_motion_contribution_s_1: np.ndarray
+    valid_path_mask: np.ndarray
     derivative_quality: DerivativeQuality
     method_id: str = WALL_VORTICITY_METHOD_ID
     evidence: str = "DERIVED"
@@ -76,7 +83,9 @@ class KinematicLift:
 
     Field arrays use dimensions ``(path_position, time, radial_fraction)``.
     Under the declared source axioms the continuum lift is exact; only the
-    pathwise derivatives of discretely stored U and A are numerical.
+    pathwise derivatives of discretely stored U and A are numerical. Positions
+    that cannot support the required second path derivative are explicitly
+    marked by ``valid_path_mask`` and have NaN derivative-dependent fields.
     """
 
     distance_m: np.ndarray
@@ -88,6 +97,7 @@ class KinematicLift:
     radial_velocity_m_s: np.ndarray
     azimuthal_vorticity_s_1: np.ndarray
     wall_vorticity_s_1: np.ndarray
+    valid_path_mask: np.ndarray
     derivative_quality: DerivativeQuality
     derivative_groups: tuple[object, ...] | None
     method_id: str = LIFT_METHOD_ID
@@ -117,6 +127,8 @@ class KinematicLift:
             "evidence": self.evidence,
             "dimensions": list(self.dimensions),
             "shape": list(self.azimuthal_vorticity_s_1.shape),
+            "valid_path_points": int(np.count_nonzero(self.valid_path_mask)),
+            "invalid_path_points": int(self.valid_path_mask.size - np.count_nonzero(self.valid_path_mask)),
             "subject_id": self.subject_id,
             "path_name": self.path_name,
             "source_artifacts": list(self.source_artifacts),
@@ -155,6 +167,7 @@ def wall_vorticity(
     z, u, area, radius = _validated_inputs(mean_velocity_m_s, area_m2, distance_m)
     du = spatial_derivatives(u, z, groups=groups)
     dr = spatial_derivatives(radius, z, groups=groups)
+    valid = du.valid_mask & dr.valid_mask
     axial = 4.0 * u / radius
     radial = (
         -0.5 * radius * du.second
@@ -171,6 +184,7 @@ def wall_vorticity(
         azimuthal_vorticity_s_1=_readonly(omega),
         axial_shear_contribution_s_1=_readonly(axial),
         radial_motion_contribution_s_1=_readonly(radial),
+        valid_path_mask=_readonly_bool(valid),
         derivative_quality=du.quality,
     )
 
@@ -208,6 +222,7 @@ def lift_axisymmetric(
 
     du = spatial_derivatives(u, z, groups=groups)
     dr = spatial_derivatives(radius, z, groups=groups)
+    valid = du.valid_mask & dr.valid_mask
     q3 = q[None, None, :]
     r = radius[:, :, None] * q3
 
@@ -237,6 +252,7 @@ def lift_axisymmetric(
         radial_velocity_m_s=_readonly(ur),
         azimuthal_vorticity_s_1=_readonly(omega),
         wall_vorticity_s_1=_readonly(omega[:, :, -1]),
+        valid_path_mask=_readonly_bool(valid),
         derivative_quality=du.quality,
         derivative_groups=group_tuple,
         subject_id=subject_id,
