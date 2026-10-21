@@ -16,6 +16,7 @@ VascuQuest began as a research-grade PWDB access layer. Version 1.0 retains that
 - **Qualified statistics** — subject-aligned descriptive/inferential analyses, bootstrap/permutation methods, correlation/partial correlation, regression, diagnostics, ANOVA/ANCOVA, multiplicity correction, and designed-cohort empirical probabilities.
 - **Vascular mechanics** — pressure-area compliance, distensibility, strain, stiffness, Bramwell-Hill wave-speed estimate, and pressure-area loop quantities.
 - **Exact vascular kinematics** — exact axisymmetric lift of path-resolved `U(z,t)` and `A(z,t)` into axial/radial velocity, the complete azimuthal-vorticity field and wall vorticity under the declared parabolic/no-swirl/incompressible source axioms, with a machine-verifiable numerical certificate and no CFD/FSI solve.
+- **Mechanical-closure kinematics** — strain/rotation topology and `Q`; Lamb vector and independently certified hydrodynamic charge; complete Newtonian wall traction; independently constructed generalized Crocco terms; near-wall Lamb loading; dimensionless mechanical-state vectors; and explicit-mapping shear/mechanical closure distances with hydrodynamic-degeneracy classification.
 - **Spectral and wave analysis** — harmonics, PSD/CSD/coherence, transfer functions, pressure-flow impedance, characteristic-impedance estimates, wave separation, reflection magnitude, wave intensity, STFT, CWT, and path-wise harmonic evolution.
 - **Scientific visualization** — declarative multi-panel figures, insets, large-cohort rendering, reproducible figure specs, and automatic collision-free exterior legends.
 
@@ -52,6 +53,18 @@ field = vq.kinematics.lift_hemospace_path(hs, "1", "aorta_foot", radial_points=1
 certificate = vq.kinematics.certify_lift(field)
 wall_vorticity = field.wall_vorticity_s_1
 
+# General mechanical-closure layer. Physical timing, pressure and scales are explicit.
+state = vq.kinematics.mechanical_state(
+    field,
+    pressure_pa,
+    time_s,
+    density_kg_m3=1050.0,
+    dynamic_viscosity_pa_s=0.004,
+    velocity_scale_m_s=0.5,
+    length_scale_m=0.01,
+)
+mechanical_certificate = vq.kinematics.certify_mechanical_state(state)
+
 figure = vq.plot.FigureSpec(
     panels=(
         vq.plot.PanelSpec(
@@ -72,7 +85,7 @@ ScientificResult / Waveform / raw aligned HEMOSPACE path waves
         ↓
 identity + alignment checks
         ↓
-mechanics / exact kinematic lift / spectral derivations as required
+mechanics / exact kinematic lift / mechanical-closure state / spectral derivations as required
         ↓
 qualified statistics
         ↓
@@ -101,11 +114,13 @@ vascuquest stats compare healthy.json disease.json --paired --method ttest
 vascuquest mechanics compute area_distensibility area.json pressure.json
 vascuquest kinematics lift --subject 1 --path aorta_foot --source /path/to/pwdb --offline --output kinematics.npz
 vascuquest kinematics certify --subject 1 --path aorta_foot --source /path/to/pwdb --offline
+vascuquest kinematics mechanical-state --subject 1 --path aorta_foot --source /path/to/pwdb --offline --sample-period-s 0.001 --density-kg-m3 1050 --viscosity-pa-s 0.004 --velocity-scale-m-s 0.5 --length-scale-m 0.01 --output mechanical-state.npz
+vascuquest kinematics mechanical-certify --subject 1 --path aorta_foot --source /path/to/pwdb --offline --sample-period-s 0.001 --density-kg-m3 1050 --viscosity-pa-s 0.004 --velocity-scale-m-s 0.5 --length-scale-m 0.01
 vascuquest spectral impedance pressure.json flow.json --harmonics 10
 vascuquest plot series pressure.json flow.json --output figure.svg --spec-output figure-spec.json
 ```
 
-The analysis CLI consumes native JSON documents exported by VascuQuest. It does not silently reinterpret arbitrary CSV columns as scientific quantities. The kinematics CLI reads canonical path-resolved PWDB artifacts through HEMOSPACE and exports the reconstructed field as compressed NPZ.
+The analysis CLI consumes native JSON documents exported by VascuQuest. It does not silently reinterpret arbitrary CSV columns as scientific quantities. The kinematics CLI reads canonical path-resolved PWDB artifacts through HEMOSPACE and exports reconstructed fields/states as compressed NPZ. Mechanical-closure commands require explicit timing, density, viscosity and characteristic scales rather than inserting physiological defaults.
 
 ## Installation
 
@@ -161,6 +176,7 @@ Consequences:
 - Statistics never erase canonical subject alignment.
 - Mechanics and spectral operations never silently resample waveforms.
 - Kinematic lifting never introduces CFD/FSI, hidden interpolation, smoothing, or an empirical closure; its continuum reconstruction is exact under its declared source axioms and its discrete spatial derivatives are reported separately.
+- Mechanical-closure analysis never constructs pressure or a Crocco term by forcing the closure residual to zero; pressure/time/material/scaling inputs are explicit, effective third-derivative runs are independently qualified, and cross-geometry closure metrics require caller-declared correspondence weights.
 - Plotting never becomes the scientific source of truth.
 - Large-cohort rendering may rasterize graphics but never silently drop observations.
 - Any aggregation, density estimation, or transformation used for visualization is explicit in the figure specification.
@@ -173,6 +189,8 @@ V1 analysis qualification is intentionally inexpensive. It relies on determinist
 - known statistical reference cases;
 - manufactured pressure-area cycles;
 - exact axisymmetric kinematic identities, including incompressibility, mean-velocity recovery, wall no-slip, curl, the rigid-tube limit, and optional `u_r(R)=R_t` wall-motion compatibility;
+- exact Poiseuille mechanical-closure identities, including `Q=0`, full wall traction, hydrodynamic-charge closure, independent Crocco closure, and closed-form near-wall Lamb loading;
+- an exact shear-equivalent Poiseuille pair that must remain mechanically non-equivalent under the declared closure metric;
 - exact sinusoidal spectra and phases;
 - known pressure-flow impedance;
 - manufactured wave-intensity inputs;
@@ -191,6 +209,7 @@ Key references:
 - [`docs/STATS.md`](docs/STATS.md)
 - [`docs/VASCULAR_MECHANICS.md`](docs/VASCULAR_MECHANICS.md)
 - [`docs/KINEMATIC_LIFT.md`](docs/KINEMATIC_LIFT.md)
+- [`docs/MECHANICAL_CLOSURE.md`](docs/MECHANICAL_CLOSURE.md)
 - [`docs/SPECTRAL_ANALYSIS.md`](docs/SPECTRAL_ANALYSIS.md)
 - [`docs/PLOTTING.md`](docs/PLOTTING.md)
 - [`docs/HEMOSPACE.md`](docs/HEMOSPACE.md)
