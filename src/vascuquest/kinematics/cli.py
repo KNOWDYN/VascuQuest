@@ -11,7 +11,11 @@ from vascuquest.hemospace.api import open_hemospace
 
 from .certificate import certify_lift
 from .mechanical_certificate import certify_mechanical_state
-from .source import lift_hemospace_path, mechanical_state_from_hemospace
+from .source import (
+    lift_hemospace_path,
+    mechanical_state_from_path_waves,
+    path_waves_from_hemospace,
+)
 
 
 kinematics_app = typer.Typer(
@@ -106,16 +110,14 @@ def _mechanical_state_from_cli(
     thickness_fraction: float,
 ):
     hs = open_hemospace(source=source, offline=offline)
-    raw = hs._session.waveform if False else None  # keep HEMOSPACE acquisition lazy; source bridge owns path reads
-    del raw
-    # Read once through the canonical bridge to determine sample count without inventing timing.
-    from .source import path_waves_from_hemospace
     waves = path_waves_from_hemospace(hs, subject, path_name, signals=("P", "U", "A"))
     samples = waves.matrix("U").shape[1]
     time_s = _required_time_vector(samples, sample_period_s)
-    from .source import mechanical_state_from_path_waves
     return mechanical_state_from_path_waves(
-        waves, time_s, density_kg_m3, viscosity_pa_s,
+        waves,
+        time_s,
+        density_kg_m3,
+        viscosity_pa_s,
         velocity_scale_m_s=velocity_scale_m_s,
         length_scale_m=length_scale_m,
         radial_points=radial_points,
@@ -142,11 +144,21 @@ def mechanical_state_command(
 ) -> None:
     """Export the mechanical-closure state from canonical P/U/A path waves."""
     state = _mechanical_state_from_cli(
-        subject,path_name,source,offline,radial_points,sample_period_s,density_kg_m3,
-        viscosity_pa_s,velocity_scale_m_s,length_scale_m,activity_threshold_fraction,thickness_fraction,
+        subject,
+        path_name,
+        source,
+        offline,
+        radial_points,
+        sample_period_s,
+        density_kg_m3,
+        viscosity_pa_s,
+        velocity_scale_m_s,
+        length_scale_m,
+        activity_threshold_fraction,
+        thickness_fraction,
     )
-    certificate=certify_mechanical_state(state)
-    output.parent.mkdir(parents=True,exist_ok=True)
+    certificate = certify_mechanical_state(state)
+    output.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
         output,
         distance_m=state.field.distance_m,
@@ -163,8 +175,10 @@ def mechanical_state_command(
         lamb_load_normal_pa=state.lamb_load.wall_normal_component_pa,
         valid_path_mask=state.valid_path_mask,
     )
-    payload=state.metadata(); payload["certificate"]=certificate.to_dict(); payload["output"]=str(output)
-    typer.echo(json.dumps(payload,sort_keys=True))
+    payload = state.metadata()
+    payload["certificate"] = certificate.to_dict()
+    payload["output"] = str(output)
+    typer.echo(json.dumps(payload, sort_keys=True))
 
 
 @kinematics_app.command("mechanical-certify")
@@ -184,11 +198,22 @@ def mechanical_certify_command(
 ) -> None:
     """Run the independent mechanical-closure certificate."""
     state = _mechanical_state_from_cli(
-        subject,path_name,source,offline,radial_points,sample_period_s,density_kg_m3,
-        viscosity_pa_s,velocity_scale_m_s,length_scale_m,activity_threshold_fraction,thickness_fraction,
+        subject,
+        path_name,
+        source,
+        offline,
+        radial_points,
+        sample_period_s,
+        density_kg_m3,
+        viscosity_pa_s,
+        velocity_scale_m_s,
+        length_scale_m,
+        activity_threshold_fraction,
+        thickness_fraction,
     )
-    payload=state.metadata(); payload["certificate"]=certify_mechanical_state(state).to_dict()
-    typer.echo(json.dumps(payload,sort_keys=True))
+    payload = state.metadata()
+    payload["certificate"] = certify_mechanical_state(state).to_dict()
+    typer.echo(json.dumps(payload, sort_keys=True))
 
 
 __all__ = ["kinematics_app"]
