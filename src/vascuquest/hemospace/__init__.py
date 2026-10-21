@@ -10,7 +10,7 @@ from .model import (
     UnavailableKnowledge,
     VirtualCardiovascularRecord,
 )
-from .path import PathCardiovascularProfile
+from .path import PathCardiovascularProfile, PathWaveField, path_waves
 from .response import DiseaseResponseRecord, ResponseItem
 from .service import HemospaceSession
 
@@ -23,6 +23,7 @@ __all__ = [
     "KnowledgeCoverage",
     "KnowledgeItem",
     "PathCardiovascularProfile",
+    "PathWaveField",
     "ResponseItem",
     "TRIAL_PROFILES",
     "TrialProfile",
@@ -30,4 +31,5 @@ __all__ = [
     "VirtualCardiovascularRecord",
     "agent_contract",
     "open_hemospace",
+    "path_waves",
 ]

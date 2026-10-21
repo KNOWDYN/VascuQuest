@@ -9,6 +9,7 @@ from . import hemospace as hemospace
 from . import analysis as analysis
 from . import stats as stats
 from . import mechanics as mechanics
+from . import kinematics as kinematics
 from . import spectral as spectral
 from . import plot as plot
 from .domain import (
@@ -29,6 +30,6 @@ __all__ = [
     "PathPosition","PluginCompatibilityError","PluginError","ProvenanceRecord","QuantityDefinition",
     "ReproducibilityError","SchemaError","ScientificResult","SegmentLocation","SelectionError","SubjectKey",
     "UnitError","VascularLocation","VascuQuestError","VascuQuestInternalError","VirtualSubject","Waveform",
-    "__version__","analysis","disease","hemospace","mechanics","open_dataset","plot","plugins",
+    "__version__","analysis","disease","hemospace","kinematics","mechanics","open_dataset","plot","plugins",
     "register_source","spectral","stats",
 ]
