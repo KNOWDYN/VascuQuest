@@ -2,7 +2,7 @@
 
 **In-silico vascular research platform for virtual cardiovascular populations.**
 
-VascuQuest 1.0 is a Python package and CLI for provenance-aware cardiovascular research over the Pulse Wave DataBase (PWDB), qualified Virtual Disease models, HEMOSPACE virtual cardiovascular records, and native statistical/mechanics/spectral/visualization workflows.
+VascuQuest 1.0 is a Python package and CLI for provenance-aware cardiovascular research over the Pulse Wave DataBase (PWDB), qualified Virtual Disease models, HEMOSPACE virtual cardiovascular records, and native statistical/mechanics/kinematics/spectral/visualization workflows.
 
 The canonical PWDB source remains Zenodo record `3275625` (DOI `10.5281/zenodo.3275625`). VascuQuest does not re-host or relicense PWDB.
 
@@ -15,6 +15,7 @@ VascuQuest began as a research-grade PWDB access layer. Version 1.0 retains that
 - **Common analysis contract** — exact dataset/subject/cohort/location/time alignment and controlled external-data wrapping.
 - **Qualified statistics** — subject-aligned descriptive/inferential analyses, bootstrap/permutation methods, correlation/partial correlation, regression, diagnostics, ANOVA/ANCOVA, multiplicity correction, and designed-cohort empirical probabilities.
 - **Vascular mechanics** — pressure-area compliance, distensibility, strain, stiffness, Bramwell-Hill wave-speed estimate, and pressure-area loop quantities.
+- **Exact vascular kinematics** — exact axisymmetric lift of path-resolved `U(z,t)` and `A(z,t)` into axial/radial velocity, the complete azimuthal-vorticity field and wall vorticity under the declared parabolic/no-swirl/incompressible source axioms, with a machine-verifiable numerical certificate and no CFD/FSI solve.
 - **Spectral and wave analysis** — harmonics, PSD/CSD/coherence, transfer functions, pressure-flow impedance, characteristic-impedance estimates, wave separation, reflection magnitude, wave intensity, STFT, CWT, and path-wise harmonic evolution.
 - **Scientific visualization** — declarative multi-panel figures, insets, large-cohort rendering, reproducible figure specs, and automatic collision-free exterior legends.
 
@@ -45,6 +46,12 @@ summary = vq.stats.describe(result)
 mechanics = vq.mechanics.area_distensibility(pressure_waveform, area_waveform)
 harmonics = vq.spectral.harmonic_amplitude(pressure_waveform, n_harmonics=10)
 
+# Exact path-resolved kinematic lift from canonical HEMOSPACE U(z,t), A(z,t).
+hs = vq.hemospace.open_hemospace(source="/path/to/pwdb", offline=True)
+field = vq.kinematics.lift_hemospace_path(hs, "1", "aorta_foot", radial_points=17)
+certificate = vq.kinematics.certify_lift(field)
+wall_vorticity = field.wall_vorticity_s_1
+
 figure = vq.plot.FigureSpec(
     panels=(
         vq.plot.PanelSpec(
@@ -61,11 +68,11 @@ The canonical scientific flow is:
 ```text
 PWDB / HEMOSPACE / persisted Virtual Disease / explicitly wrapped external result
         ↓
-ScientificResult / Waveform
+ScientificResult / Waveform / raw aligned HEMOSPACE path waves
         ↓
 identity + alignment checks
         ↓
-mechanics / spectral derivations as required
+mechanics / exact kinematic lift / spectral derivations as required
         ↓
 qualified statistics
         ↓
@@ -81,6 +88,7 @@ The original dataset, disease, and HEMOSPACE commands remain available. V1 adds:
 ```text
 vascuquest stats ...
 vascuquest mechanics ...
+vascuquest kinematics ...
 vascuquest spectral ...
 vascuquest plot ...
 ```
@@ -91,11 +99,13 @@ Examples:
 vascuquest stats describe result.json
 vascuquest stats compare healthy.json disease.json --paired --method ttest
 vascuquest mechanics compute area_distensibility area.json pressure.json
+vascuquest kinematics lift --subject 1 --path aorta_foot --source /path/to/pwdb --offline --output kinematics.npz
+vascuquest kinematics certify --subject 1 --path aorta_foot --source /path/to/pwdb --offline
 vascuquest spectral impedance pressure.json flow.json --harmonics 10
 vascuquest plot series pressure.json flow.json --output figure.svg --spec-output figure-spec.json
 ```
 
-The analysis CLI consumes native JSON documents exported by VascuQuest. It does not silently reinterpret arbitrary CSV columns as scientific quantities.
+The analysis CLI consumes native JSON documents exported by VascuQuest. It does not silently reinterpret arbitrary CSV columns as scientific quantities. The kinematics CLI reads canonical path-resolved PWDB artifacts through HEMOSPACE and exports the reconstructed field as compressed NPZ.
 
 ## Installation
 
@@ -150,6 +160,7 @@ Consequences:
 - Virtual Disease remains the owner of disease-state generation and physics.
 - Statistics never erase canonical subject alignment.
 - Mechanics and spectral operations never silently resample waveforms.
+- Kinematic lifting never introduces CFD/FSI, hidden interpolation, smoothing, or an empirical closure; its continuum reconstruction is exact under its declared source axioms and its discrete spatial derivatives are reported separately.
 - Plotting never becomes the scientific source of truth.
 - Large-cohort rendering may rasterize graphics but never silently drop observations.
 - Any aggregation, density estimation, or transformation used for visualization is explicit in the figure specification.
@@ -161,6 +172,7 @@ V1 analysis qualification is intentionally inexpensive. It relies on determinist
 
 - known statistical reference cases;
 - manufactured pressure-area cycles;
+- exact axisymmetric kinematic identities, including incompressibility, mean-velocity recovery, wall no-slip, curl, the rigid-tube limit, and optional `u_r(R)=R_t` wall-motion compatibility;
 - exact sinusoidal spectra and phases;
 - known pressure-flow impedance;
 - manufactured wave-intensity inputs;
@@ -178,6 +190,7 @@ Key references:
 - [`docs/ANALYSIS.md`](docs/ANALYSIS.md)
 - [`docs/STATS.md`](docs/STATS.md)
 - [`docs/VASCULAR_MECHANICS.md`](docs/VASCULAR_MECHANICS.md)
+- [`docs/KINEMATIC_LIFT.md`](docs/KINEMATIC_LIFT.md)
 - [`docs/SPECTRAL_ANALYSIS.md`](docs/SPECTRAL_ANALYSIS.md)
 - [`docs/PLOTTING.md`](docs/PLOTTING.md)
 - [`docs/HEMOSPACE.md`](docs/HEMOSPACE.md)
