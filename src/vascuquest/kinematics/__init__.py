@@ -14,6 +14,7 @@ from .core import (
     wall_vorticity,
 )
 from .derivatives import DerivativeQuality, SpatialDerivatives, spatial_derivatives
+from .source import lift_hemospace_path, path_waves_from_hemospace
 
 __all__ = [
     "DerivativeQuality",
@@ -25,8 +26,10 @@ __all__ = [
     "WallVorticityResult",
     "certify_lift",
     "lift_axisymmetric",
+    "lift_hemospace_path",
     "lift_path",
     "near_wall_vorticity",
+    "path_waves_from_hemospace",
     "radial_grid",
     "radius_from_area",
     "spatial_derivatives",
