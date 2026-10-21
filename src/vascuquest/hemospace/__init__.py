@@ -14,11 +14,11 @@ from .path import PathCardiovascularProfile, PathWaveField, path_waves
 from .remote_hdf5 import HTTPRangeReader, open_remote_hdf5
 from .remote_path import (
     AlignedPathSegment,
-    PWDBRemotePathClient,
     RaggedPathWaveField,
     RemoteArtifactIdentity,
     merge_ragged_path_fields,
 )
+from .remote_pwdb import PWDBRemotePathClient
 from .response import DiseaseResponseRecord, ResponseItem
 from .service import HemospaceSession
 
