@@ -13,6 +13,8 @@ from .derivatives import spatial_derivatives
 
 @dataclass(frozen=True, slots=True)
 class KinematicCertificate:
+    qualified_path_points: int
+    masked_path_points: int
     mean_velocity_max_abs_error: float
     axis_radial_velocity_max_abs: float
     axis_vorticity_max_abs: float
@@ -27,6 +29,8 @@ class KinematicCertificate:
 
     def to_dict(self) -> dict[str, object]:
         return {
+            "qualified_path_points": self.qualified_path_points,
+            "masked_path_points": self.masked_path_points,
             "mean_velocity_max_abs_error": self.mean_velocity_max_abs_error,
             "axis_radial_velocity_max_abs": self.axis_radial_velocity_max_abs,
             "axis_vorticity_max_abs": self.axis_vorticity_max_abs,
@@ -42,7 +46,9 @@ class KinematicCertificate:
 
 
 def _max_abs(values: np.ndarray) -> float:
-    return float(np.max(np.abs(values))) if values.size else 0.0
+    flat = np.asarray(values, dtype=float).reshape(-1)
+    finite = flat[np.isfinite(flat)]
+    return float(np.max(np.abs(finite))) if finite.size else 0.0
 
 
 def certify_lift(
@@ -57,7 +63,8 @@ def certify_lift(
     The continuum identities are exact. This certificate checks the returned
     discretized arrays using independent quadrature and finite-difference curl/
     divergence evaluations. It therefore measures implementation/discretization
-    consistency, not model-form uncertainty.
+    consistency, not model-form uncertainty. Anatomically under-resolved path
+    runs remain masked and are excluded from derivative-dependent residuals.
     """
 
     q = np.asarray(field.radial_fraction, dtype=float)
@@ -67,12 +74,13 @@ def certify_lift(
     uz = np.asarray(field.axial_velocity_m_s, dtype=float)
     ur = np.asarray(field.radial_velocity_m_s, dtype=float)
     omega = np.asarray(field.azimuthal_vorticity_s_1, dtype=float)
+    valid = np.asarray(field.valid_path_mask, dtype=bool)
     groups = field.derivative_groups
 
     reconstructed_mean = 2.0 * np.trapezoid(uz * q[None, None, :], x=q, axis=2)
     mean_error = _max_abs(reconstructed_mean - u)
-    axis_ur = _max_abs(ur[:, :, 0])
-    axis_omega = _max_abs(omega[:, :, 0])
+    axis_ur = _max_abs(ur[valid, :, 0])
+    axis_omega = _max_abs(omega[valid, :, 0])
     wall_uz = _max_abs(uz[:, :, -1])
 
     radius3 = radius[:, :, None]
@@ -88,27 +96,27 @@ def certify_lift(
     dur_dz_r = dur_dz_q - transform * dur_dq
     duz_dr = duz_dq / radius3
     curl_numeric = dur_dz_r - duz_dr
-    curl_error = _max_abs(curl_numeric - omega)
+    curl_error = _max_abs((curl_numeric - omega)[valid])
 
     physical_r = q3 * radius3
     r_ur = physical_r * ur
     d_rur_dq = np.gradient(r_ur, q, axis=2, edge_order=2)
     radial_divergence = d_rur_dq[:, :, 1:] / (q3[:, :, 1:] * radius3**2)
     divergence = radial_divergence + duz_dz_r[:, :, 1:]
-    divergence_error = _max_abs(divergence)
+    divergence_error = _max_abs(divergence[valid])
 
     structural_scale = max(
         1.0,
-        _max_abs(u / radius),
-        _max_abs(spatial_derivatives(u, z, groups=groups).first),
+        _max_abs((u / radius)[valid]),
+        _max_abs(spatial_derivatives(u, z, groups=groups).first[valid]),
     )
     passed = (
         mean_error <= atol + rtol * max(1.0, _max_abs(u))
-        and axis_ur <= atol + rtol * max(1.0, _max_abs(ur))
-        and axis_omega <= atol + rtol * max(1.0, _max_abs(omega))
+        and axis_ur <= atol + rtol * max(1.0, _max_abs(ur[valid]))
+        and axis_omega <= atol + rtol * max(1.0, _max_abs(omega[valid]))
         and wall_uz <= atol + rtol * max(1.0, _max_abs(uz))
         and divergence_error <= atol + rtol * structural_scale
-        and curl_error <= atol + rtol * max(1.0, _max_abs(omega))
+        and curl_error <= atol + rtol * max(1.0, _max_abs(omega[valid]))
     )
 
     continuity_error: float | None = None
@@ -126,14 +134,16 @@ def certify_lift(
         du = spatial_derivatives(u, z, groups=groups).first
         dr = spatial_derivatives(radius, z, groups=groups).first
         continuity = rt + u * dr + 0.5 * radius * du
-        continuity_error = _max_abs(continuity)
-        wall_motion_error = _max_abs(ur[:, :, -1] - rt)
+        continuity_error = _max_abs(continuity[valid])
+        wall_motion_error = _max_abs((ur[:, :, -1] - rt)[valid])
     else:
         warnings.append(
             "time_s was not supplied; the optional source-continuity and u_r(R)=R_t numerical certificate was not evaluated"
         )
 
     return KinematicCertificate(
+        qualified_path_points=int(np.count_nonzero(valid)),
+        masked_path_points=int(valid.size - np.count_nonzero(valid)),
         mean_velocity_max_abs_error=mean_error,
         axis_radial_velocity_max_abs=axis_ur,
         axis_vorticity_max_abs=axis_omega,
