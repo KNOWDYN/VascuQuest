@@ -79,15 +79,20 @@ def spatial_derivatives(
     distance_m: object,
     *,
     groups: Sequence[object] | None = None,
+    minimum_points: int = 3,
 ) -> SpatialDerivatives:
     """Differentiate an array along axis 0 without interpolation or smoothing.
 
     ``distance_m`` may be nonuniform. When ``groups`` is supplied, derivatives
     are evaluated independently on each contiguous group and never cross a
-    declared anatomical boundary. Runs with fewer than three stored positions
-    are explicitly masked because their required second derivative is not
-    identifiable from the stored samples.
+    declared anatomical boundary. Runs shorter than ``minimum_points`` are
+    explicitly masked. The default of three preserves the exact-lift contract;
+    downstream operators that introduce an effective third source derivative
+    can require four or more points without changing the base lift.
     """
+
+    if minimum_points < 3:
+        raise ValueError("minimum_points must be at least 3")
 
     z = np.asarray(distance_m, dtype=float)
     a = np.asarray(values, dtype=float)
@@ -109,9 +114,10 @@ def spatial_derivatives(
     for start, stop in runs:
         count = stop - start
         minimum_run_points = min(minimum_run_points, count)
-        if count < 3:
+        if count < minimum_points:
             warnings.append(
-                f"differentiation run [{start}:{stop}] has only {count} point(s); derivatives are masked"
+                f"differentiation run [{start}:{stop}] has only {count} point(s); "
+                f"minimum {minimum_points} required, derivatives are masked"
             )
             continue
         local = a[start:stop]
@@ -136,7 +142,9 @@ def spatial_derivatives(
         valid[start:stop] = True
 
     if not np.any(valid):
-        raise AdmissibilityError("no anatomical differentiation run contains the three stored positions required for vorticity")
+        raise AdmissibilityError(
+            f"no anatomical differentiation run contains the required minimum of {minimum_points} stored positions"
+        )
 
     dz_all = np.diff(z)
     quality = DerivativeQuality(
