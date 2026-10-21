@@ -61,6 +61,7 @@ def lift_command(
         radial_velocity_m_s=field.radial_velocity_m_s,
         azimuthal_vorticity_s_1=field.azimuthal_vorticity_s_1,
         wall_vorticity_s_1=field.wall_vorticity_s_1,
+        valid_path_mask=field.valid_path_mask,
     )
     typer.echo(json.dumps(_payload(field, certificate, output), sort_keys=True))
 
