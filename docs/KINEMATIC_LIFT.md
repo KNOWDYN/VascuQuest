@@ -131,9 +131,9 @@ as the axial-shear contribution plus the radial-motion/path-variation contributi
 
 `U_z`, `U_zz`, `R_z`, and `R_zz` are evaluated directly on the stored physical path coordinate using nonuniform finite differences. VascuQuest does not silently interpolate, resample, or smooth path signals.
 
-When anatomical groups are supplied, differentiation is confined to contiguous groups. A group with fewer than three stored positions is inadmissible because the second spatial derivative required by the exact vorticity expression is not identifiable from that run.
+When anatomical groups are supplied, differentiation is confined to each contiguous group and never crosses the declared anatomical boundary. A group with fewer than three stored positions cannot identify the second spatial derivative required by the exact vorticity expression, so derivative-dependent outputs for that run are explicitly `NaN` and its positions are false in `valid_path_mask`. Other adequately resolved groups remain usable. The operation fails only when no anatomical run contains at least three stored positions.
 
-Every result carries deterministic derivative-quality diagnostics including path spacing, minimum run length, spacing ratio, and warnings.
+Every result carries deterministic derivative-quality diagnostics including path spacing, minimum run length, qualified and masked point counts, spacing ratio, and warnings. `valid_path_mask` is exported with CLI field files so downstream analyses can preserve this qualification explicitly.
 
 ## Mathematical and numerical certificate
 
@@ -145,6 +145,8 @@ Every result carries deterministic derivative-quality diagnostics including path
 4. an independently differentiated divergence check;
 5. an independently differentiated curl check;
 6. optionally, when a physical time vector is supplied, the source continuity residual and `u_r(R)=R_t` wall-motion identity.
+
+Derivative-dependent certificate residuals are evaluated only at qualified path positions. Masked positions remain explicit and are never filled by interpolation across an anatomical boundary.
 
 The continuum identities are algebraic. The reported residuals quantify numerical differentiation/quadrature consistency only.
 
@@ -166,6 +168,7 @@ wall_omega = field.wall_vorticity_s_1
 omega = field.azimuthal_vorticity_s_1
 u_r = field.radial_velocity_m_s
 u_z = field.axial_velocity_m_s
+qualified = field.valid_path_mask
 ```
 
 Field arrays use dimensions
