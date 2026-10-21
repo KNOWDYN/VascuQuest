@@ -22,11 +22,13 @@ def test_rigid_uniform_tube_recovers_parabolic_vorticity_exactly():
     q = field.radial_fraction[None, None, :]
     expected = 4.0 * u[:, :, None] * q / radius
 
+    assert np.all(field.valid_path_mask)
     assert np.allclose(field.radial_velocity_m_s, 0.0, atol=1e-12)
     assert np.allclose(field.azimuthal_vorticity_s_1, expected, atol=1e-10)
     assert np.allclose(field.wall_vorticity_s_1, 4.0 * u / radius, atol=1e-10)
 
     wall = wall_vorticity(u, area, z)
+    assert np.all(wall.valid_path_mask)
     assert np.allclose(wall.radial_motion_contribution_s_1, 0.0, atol=1e-12)
     assert np.allclose(wall.azimuthal_vorticity_s_1, 4.0 * u / radius, atol=1e-10)
 
@@ -45,6 +47,8 @@ def test_travelling_compliant_tube_satisfies_continuity_and_wall_motion():
 
     assert certificate.passed_structural_checks
     assert certificate.time_certificate_available
+    assert certificate.qualified_path_points == z.size
+    assert certificate.masked_path_points == 0
     assert certificate.continuity_max_abs is not None
     assert certificate.wall_motion_max_abs_error is not None
     assert certificate.continuity_max_abs < 1e-11
@@ -72,8 +76,23 @@ def test_wall_vorticity_matches_closed_form_for_quadratic_U_and_linear_R():
     assert np.allclose(result.azimuthal_vorticity_s_1[:, 0], expected, rtol=1e-10, atol=1e-10)
 
 
-def test_derivative_contract_refuses_short_anatomical_runs():
+def test_derivative_contract_masks_short_anatomical_runs_without_crossing_boundaries():
     z = np.linspace(0.0, 1.0, 5)
     values = z**2
-    with pytest.raises(AdmissibilityError, match="at least three stored path positions"):
-        spatial_derivatives(values, z, groups=("a", "a", "b", "b", "b"))
+    result = spatial_derivatives(values, z, groups=("a", "a", "b", "b", "b"))
+
+    assert result.valid_mask.tolist() == [False, False, True, True, True]
+    assert np.all(np.isnan(result.first[:2]))
+    assert np.all(np.isnan(result.second[:2]))
+    assert np.all(np.isfinite(result.first[2:]))
+    assert np.all(np.isfinite(result.second[2:]))
+    assert result.quality.valid_point_count == 3
+    assert result.quality.invalid_point_count == 2
+    assert any("masked" in warning for warning in result.quality.warnings)
+
+
+def test_derivative_contract_rejects_when_no_run_supports_second_derivative():
+    z = np.linspace(0.0, 1.0, 4)
+    values = z**2
+    with pytest.raises(AdmissibilityError, match="no anatomical differentiation run"):
+        spatial_derivatives(values, z, groups=("a", "a", "b", "b"))
