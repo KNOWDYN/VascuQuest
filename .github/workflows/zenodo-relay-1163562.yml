@@ -1,4 +1,4 @@
-name: Temporary Zenodo relay 1163562
+name: Temporary Zenodo chunk relay 1163562
 
 on:
   push:
@@ -14,98 +14,86 @@ jobs:
     outputs:
       matrix: ${{ steps.meta.outputs.matrix }}
     steps:
-      - name: Fetch Zenodo record metadata
+      - name: Build byte-range chunk matrix from Zenodo API
         id: meta
         shell: bash
         run: |
           python - <<'PY'
-          import json, os, requests
-          record_url = 'https://zenodo.org/api/records/1163562'
-          r = requests.get(record_url, timeout=120)
+          import json, math, os, requests
+          CHUNK = 400_000_000
+          r = requests.get('https://zenodo.org/api/records/1163562', timeout=120)
           r.raise_for_status()
           data = r.json()
-          with open('zenodo_record_1163562.json', 'w', encoding='utf-8') as f:
-              json.dump(data, f, indent=2, ensure_ascii=False)
-          items=[]
-          for i, item in enumerate(data.get('files', [])):
-              links=item.get('links', {})
-              url=links.get('content') or links.get('self')
+          rows=[]
+          for i,item in enumerate(data.get('files', [])):
+              size=int(item.get('size', item.get('filesize',0)))
               key=item.get('key') or item.get('filename') or f'file_{i}'
-              items.append({
-                  'i': i,
-                  'key': key,
-                  'url': url,
-                  'checksum': item.get('checksum',''),
-                  'size': item.get('size', item.get('filesize', 0))
-              })
-          matrix=json.dumps({'include':items}, separators=(',',':'))
-          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as out:
-              out.write('matrix='+matrix+'\n')
-          with open('zenodo_file_manifest.json','w',encoding='utf-8') as f:
-              json.dump(items,f,indent=2,ensure_ascii=False)
-          print(f'Files discovered: {len(items)}')
-          print(f'Total bytes: {sum(int(x.get("size") or 0) for x in items)}')
-          for x in items:
-              print(x['i'], x['key'], x['size'], x['checksum'])
+              url=(item.get('links') or {}).get('content') or (item.get('links') or {}).get('self')
+              checksum=item.get('checksum','')
+              parts=math.ceil(size/CHUNK)
+              for part in range(parts):
+                  start=part*CHUNK
+                  end=min(size-1,(part+1)*CHUNK-1)
+                  rows.append({'i':i,'key':key,'url':url,'checksum':checksum,'size':size,'part':part,'parts':parts,'start':start,'end':end,'chunk_size':end-start+1})
+          matrix=json.dumps({'include':rows},separators=(',',':'))
+          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:
+              f.write('matrix='+matrix+'\n')
+          print('Chunk jobs:',len(rows))
+          for row in rows:
+              print(row['i'],row['part'],row['start'],row['end'],row['key'])
           PY
-      - name: Upload metadata
-        uses: actions/upload-artifact@v7
-        with:
-          name: zenodo-record-metadata
-          path: |
-            zenodo_record_1163562.json
-            zenodo_file_manifest.json
-          retention-days: 1
 
-  download:
+  chunk:
     needs: discover
-    if: ${{ needs.discover.outputs.matrix != '' }}
     strategy:
       fail-fast: false
+      max-parallel: 8
       matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
     runs-on: ubuntu-latest
     steps:
-      - name: Download and verify one Zenodo file
+      - name: Download one exact byte range
         env:
-          ZENODO_URL: ${{ matrix.url }}
-          ZENODO_KEY: ${{ matrix.key }}
-          ZENODO_CHECKSUM: ${{ matrix.checksum }}
-          ZENODO_SIZE: ${{ matrix.size }}
-          ZENODO_INDEX: ${{ matrix.i }}
+          URL: ${{ matrix.url }}
+          KEY: ${{ matrix.key }}
+          FILE_INDEX: ${{ matrix.i }}
+          FULL_SIZE: ${{ matrix.size }}
+          FULL_CHECKSUM: ${{ matrix.checksum }}
+          PART: ${{ matrix.part }}
+          PARTS: ${{ matrix.parts }}
+          START: ${{ matrix.start }}
+          END: ${{ matrix.end }}
+          CHUNK_SIZE: ${{ matrix.chunk_size }}
         shell: bash
         run: |
           python - <<'PY'
-          import hashlib, json, os, pathlib, requests, sys
-          url=os.environ['ZENODO_URL']
-          key=os.environ['ZENODO_KEY']
-          checksum=os.environ.get('ZENODO_CHECKSUM','')
-          expected_size=int(os.environ.get('ZENODO_SIZE') or 0)
-          idx=os.environ['ZENODO_INDEX']
-          outdir=pathlib.Path('downloads')/idx
-          outdir.mkdir(parents=True,exist_ok=True)
-          out=outdir/key
-          h=hashlib.md5()
-          n=0
-          with requests.get(url,stream=True,timeout=(60,600),allow_redirects=True) as r:
-              r.raise_for_status()
+          import hashlib, json, os, pathlib, requests
+          url=os.environ['URL']; start=int(os.environ['START']); end=int(os.environ['END']); expected=int(os.environ['CHUNK_SIZE'])
+          idx=int(os.environ['FILE_INDEX']); part=int(os.environ['PART'])
+          outdir=pathlib.Path('chunk'); outdir.mkdir(exist_ok=True)
+          out=outdir/f'f{idx:02d}.part{part:03d}.bin'
+          headers={'Range':f'bytes={start}-{end}','Accept-Encoding':'identity'}
+          h=hashlib.sha256(); n=0
+          with requests.get(url,headers=headers,stream=True,timeout=(60,600),allow_redirects=True) as r:
+              if r.status_code != 206:
+                  raise SystemExit(f'Zenodo range request returned HTTP {r.status_code}, expected 206')
+              cr=r.headers.get('Content-Range','')
+              expected_cr=f'bytes {start}-{end}/'
+              if not cr.startswith(expected_cr):
+                  raise SystemExit(f'Unexpected Content-Range: {cr!r}')
               with open(out,'wb') as f:
-                  for chunk in r.iter_content(chunk_size=8*1024*1024):
-                      if not chunk: continue
-                      f.write(chunk); h.update(chunk); n += len(chunk)
-          actual='md5:'+h.hexdigest()
-          if expected_size and n != expected_size:
-              raise SystemExit(f'size mismatch: {n} != {expected_size}')
-          if checksum and checksum.lower() != actual.lower():
-              raise SystemExit(f'checksum mismatch: {actual} != {checksum}')
-          manifest={'index':int(idx),'key':key,'source_url':url,'expected_size':expected_size,'actual_size':n,'expected_checksum':checksum,'actual_checksum':actual,'verified':True}
-          with open(outdir/'TRANSFER.json','w',encoding='utf-8') as f:
-              json.dump(manifest,f,indent=2)
-          print(json.dumps(manifest,indent=2))
+                  for b in r.iter_content(chunk_size=8*1024*1024):
+                      if b:
+                          f.write(b); h.update(b); n += len(b)
+          if n != expected:
+              raise SystemExit(f'chunk size mismatch: {n} != {expected}')
+          meta={'file_index':idx,'source_key':os.environ['KEY'],'part':part,'parts':int(os.environ['PARTS']),'start':start,'end':end,'chunk_size':n,'chunk_sha256':'sha256:'+h.hexdigest(),'full_size':int(os.environ['FULL_SIZE']),'full_checksum':os.environ['FULL_CHECKSUM'],'source_url':url}
+          with open(outdir/'CHUNK.json','w',encoding='utf-8') as f: json.dump(meta,f,indent=2)
+          print(json.dumps(meta,indent=2))
           PY
-      - name: Upload verified file
+      - name: Upload chunk
         uses: actions/upload-artifact@v7
         with:
-          name: zenodo-file-${{ matrix.i }}
-          path: downloads/${{ matrix.i }}/
+          name: z1163562-f${{ matrix.i }}-p${{ matrix.part }}
+          path: chunk/
           retention-days: 1
           compression-level: 0
