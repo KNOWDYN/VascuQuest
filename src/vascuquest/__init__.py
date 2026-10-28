@@ -11,6 +11,7 @@ from . import stats as stats
 from . import mechanics as mechanics
 from . import kinematics as kinematics
 from . import spectral as spectral
+from . import cardioacoustics as cardioacoustics
 from . import plot as plot
 from .domain import (
     Cohort, Coordinate, DatasetIdentity, EvidenceClass, MeasurementSite, PathPosition,
@@ -30,6 +31,6 @@ __all__ = [
     "PathPosition","PluginCompatibilityError","PluginError","ProvenanceRecord","QuantityDefinition",
     "ReproducibilityError","SchemaError","ScientificResult","SegmentLocation","SelectionError","SubjectKey",
     "UnitError","VascularLocation","VascuQuestError","VascuQuestInternalError","VirtualSubject","Waveform",
-    "__version__","analysis","disease","hemospace","kinematics","mechanics","open_dataset","plot","plugins",
-    "register_source","spectral","stats",
+    "__version__","analysis","cardioacoustics","disease","hemospace","kinematics","mechanics","open_dataset",
+    "plot","plugins","register_source","spectral","stats",
 ]
