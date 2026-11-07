@@ -1,0 +1,28 @@
+name: VascuQuest website checks
+
+on:
+  pull_request:
+    paths:
+      - "site/**"
+      - "tests/site/**"
+      - ".github/workflows/site-checks.yml"
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "tests/site/**"
+      - ".github/workflows/site-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check JavaScript syntax
+        run: node --check site/app.js
+      - name: Check website structure and mathematical references
+        run: python3 tests/site/check_site.py
