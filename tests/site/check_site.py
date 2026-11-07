@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""VascuQuest website smoke and analytical-reference tests (stdlib only)."""
+"""VascuQuest website smoke tests (Python standard library only)."""
 from html.parser import HTMLParser
 from pathlib import Path
-from math import pi, sin, cos, isclose
+import json
+from math import isclose
 
 ROOT = Path(__file__).resolve().parents[2]
 SITE = ROOT / "site"
-INDEX = (SITE / "index.html").read_text(encoding="utf-8")
+HTML = (SITE / "index.html").read_text(encoding="utf-8")
 JS = (SITE / "app.js").read_text(encoding="utf-8")
 CSS = (SITE / "styles.css").read_text(encoding="utf-8")
+DATA_PATH = SITE / "assets" / "cardioacoustics-dashboard.json"
+DATA = json.loads(DATA_PATH.read_text(encoding="utf-8"))
 
 
 class Inventory(HTMLParser):
@@ -16,7 +19,7 @@ class Inventory(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.ids = []
         self.h1 = 0
-        self.local_files = []
+        self.files = []
         self.links = []
         self.buttons = 0
 
@@ -30,44 +33,61 @@ class Inventory(HTMLParser):
             self.buttons += 1
         if tag == "a":
             self.links.append(a.get("href", ""))
-        for key in ("href", "src"):
+        for key in ("href", "src", "data-source"):
             val = a.get(key, "")
             if val.startswith(("styles.css", "app.js", "assets/")):
-                self.local_files.append(val.split("?", 1)[0])
+                self.files.append(val.split("?", 1)[0])
 
 
 page = Inventory()
-page.feed(INDEX)
-assert page.h1 == 1, "Expected exactly one homepage H1"
-assert len(page.ids) == len(set(page.ids)), "Duplicate HTML IDs found"
-assert {"main", "top", "frontiers", "workflow", "laboratory", "capabilities", "evidence", "start"}.issubset(set(page.ids))
-assert page.buttons >= 5, "Expected interactive explorer and navigation controls"
-assert all(v and v != "#" for v in page.links), "Found empty navigation link"
-assert all((SITE / p).is_file() for p in page.local_files), "Missing a local site asset"
-assert "https://knowdyn.github.io/VascuQuest/" in INDEX, "Incorrect Pages canonical address"
-assert "The future of endovascular research," in INDEX, "New hero heading missing"
-assert "assets/stroke-intervention.svg" in INDEX, "Endovascular hero artwork missing"
-assert (SITE / "assets" / "stroke-intervention.svg").is_file(), "Stroke intervention SVG missing"
-assert all(x in INDEX for x in ("HEMOSPACE", "Virtual Disease", "Exact Kinematics", "INFERRED", "MODELLED"))
+page.feed(HTML)
+assert page.h1 == 1, "Expected exactly one H1"
+assert len(page.ids) == len(set(page.ids)), "Duplicate IDs"
+assert {"main", "top", "frontiers", "workflow", "laboratory", "capabilities", "evidence", "start"}.issubset(page.ids)
+assert {"rc-spectrum", "rc-phasor", "rc-pwv", "rc-matrix-body", "rc-pressure"}.issubset(page.ids)
+assert page.buttons >= 10, "Research controls missing"
+assert all(a and a != "#" for a in page.links), "Invalid internal links"
+assert all((SITE / file).is_file() for file in page.files), "Local site asset missing"
+assert "https://knowdyn.github.io/VascuQuest/" in HTML
+assert "The future of endovascular research," in HTML
+assert "assets/stroke-intervention.svg" in HTML
 assert "prefers-reduced-motion" in JS and "prefers-reduced-motion" in CSS
 assert "aria-pressed" in JS and "aria-expanded" in JS
-assert "test_mechanics.py" in JS and "test_spectral.py" in JS
+assert "cardioacoustics-dashboard.json" in HTML
+assert "1048" in HTML, "Subject provenance missing"
+assert "M1" in HTML, "Stroke imaging context missing"
 
-# The exact manufactured signals are taken from existing scientific tests.
-n = 256
-t = [j / n for j in range(n)]
-mechanics_pressure = [100.0 + 20.0 * sin(2*pi*x) for x in t]
-mechanics_area_m2 = [1e-4 * (1.0 + 0.08 * sin(2*pi*x)) for x in t]
-spectral_pressure = [10000.0 + 2000.0 * sin(2*pi*x) for x in t]
+assert DATA["archive"] == "Cardioacoustics_ECs_v1.0.0"
+assert DATA["subjects"] == 102
+assert len(DATA["sites"]) == 5 and len(DATA["states"]) == 3
+assert DATA["states"] == ["healthy", "partial", "stiff"]
+assert DATA["sourceFrequencyHz"]["count"] == 61
+assert DATA["sourceFrequencyHz"]["start"] == 10 and DATA["sourceFrequencyHz"]["end"] == 40
+assert len(DATA["sampleFrequencyHz"]) == 21
+assert isclose(DATA["sampleFrequencyHz"][0], 10.0) and isclose(DATA["sampleFrequencyHz"][-1], 40.0)
+assert DATA["source_event_frequency_hz"] == 18
+assert DATA["source_event_pressure_pa"] == 310
+assert len(DATA["sha256"]) == 64
 
-assert isclose(mechanics_pressure[64], 120.0, abs_tol=1e-10)
-assert isclose(mechanics_area_m2[64] * 1e6, 108.0, abs_tol=1e-10)
-assert isclose(spectral_pressure[64], 12000.0, abs_tol=1e-10)
+sites = {site["id"]: site for site in DATA["sites"]}
+assert set(sites) == {"proximal_aorta", "left_common_carotid", "abdominal_aorta_iv", "left_common_iliac", "left_femoral_path"}
+assert [sites[s]["segment"] for s in ["proximal_aorta", "left_common_carotid", "abdominal_aorta_iv", "left_common_iliac", "left_femoral_path"]] == [1, 15, 39, 42, 46]
 
-# Independent direct DFT confirms the spectral reference plotted in the explorer.
-re = sum(y * cos(2*pi*j/n) for j, y in enumerate(spectral_pressure))
-im = -sum(y * sin(2*pi*j/n) for j, y in enumerate(spectral_pressure))
-harmonic_1 = 2 * ((re*re + im*im)**0.5) / n
-assert isclose(harmonic_1, 2000.0, rel_tol=1e-12)
+for site in DATA["sites"]:
+    assert len(site["states"]) == 3
+    for state in site["states"]:
+        for key in ("gain", "traction", "motion"):
+            assert len(state[key]) == 21
+            assert all(isinstance(v, (int, float)) for v in state[key])
+        assert len(state["refP"]) == 2
+        assert all(state[k] >= 0 for k in ("p50", "t50", "m50", "acc50", "grad50"))
 
-print("PASS: semantic HTML, links, assets, accessibility controls and analytical references")
+assert isclose(sites["left_common_carotid"]["states"][0]["p50"], 240.6)
+assert isclose(sites["abdominal_aorta_iv"]["states"][0]["p50"], 313.0)
+assert isclose(sites["left_common_carotid"]["states"][0]["t50"], 0.420)
+assert isclose(sites["left_common_carotid"]["states"][0]["m50"], 8.71)
+assert all(len(DATA["pwv"][wall]) == 6 for wall in DATA["states"])
+assert isclose(DATA["pwv"]["healthy"][0], 5.95)
+assert isclose(DATA["pwv"]["stiff"][-1], 12.44)
+
+print("PASS: semantic page, responsive controls, authentic archive summary, 5 arteries, 3 states and source provenance")

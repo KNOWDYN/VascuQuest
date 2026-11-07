@@ -1,61 +1,62 @@
-# VascuQuest website — research experience
+# VascuQuest public research experience
 
-This directory contains the premium single-page GitHub Pages website for VascuQuest. The website and the scientific Python library have separate release surfaces.
+The website is a dependency-free HTML/CSS/JavaScript GitHub Pages project. The browser reads a compact research summary generated entirely from the supplied \`Cardioacoustics_ECs_v1.0.0.zip\` archive.
 
-## Implementation decision
+## Interactive Research Signal Explorer
 
-The seventh design decision allowed an architecture-neutral implementation. After inspecting the actual site, the redesign retains its small static HTML/CSS/JavaScript foundation rather than introducing AstroWind or a frontend runtime. The experience consists of one page and two deterministic mathematical explorers, making a static build the smallest maintainable solution. AstroWind remains a design-system reference rather than a copied dependency.
+This version presents an integrated computational cardiovascular laboratory containing:
 
-The repository's existing Pages workflow publishes this directory. All asset paths remain relative to the project URL at \`https://knowdyn.github.io/VascuQuest/\`. No package manager or runtime build is needed.
+- Five mapped arterial sites from the archived PWDB study: proximal aorta (segment 1), left common carotid (15), abdominal aorta IV (39), left common iliac (42) and left femoral path (46).
+- Three archived arterial wall states: healthy, partially stiffened and stiffened.
+- Three frequency-response channels: pressure transfer gain (dB), tangential endothelial traction transfer (mPa per Pa root pressure) and wall-displacement transfer (nm per Pa root pressure).
+- Cohort medians over 102 virtual subjects. The archive contains 61 source frequency bins from 10–40 Hz; the public plot displays an every-third-bin subset (21 sampled frequencies).
+- WP2/A2 exposure at 18 Hz and an independently literature-anchored 310 Pa root pressure. The inspector presents cohort medians of absolute local pressure, local traction, wall displacement, wall acceleration and traction gradient.
+- An eighteen-hertz harmonic trace reconstructed mathematically from the complex local WP2/A2 pressure phasors for archived virtual subject #1048. This is explicitly presented as a single-frequency phasor reconstruction, rather than a measured waveform.
+- Six-stratum (ages 25–75) median carotid–femoral PWV comparisons for the three model states.
+- A cross-artery matrix of median local pressure phasor magnitudes for WP2/A2.
+- A distinct model catalogue linking to VascuQuest's four disease presets: carotid and iliac stenosis, abdominal aortic aneurysm, and large-artery stiffening.
 
-## Visual direction
+The archived vascular wall states, the wider Virtual Disease model presets and the concept of cardiovascular risk research have separate scientific meanings. The website uses explicit labels and provenance to keep them distinct. All quantitative signals and metrics shown in the explorer are derived from the attached archive; the browser does not manufacture novel physiological records.
 
-- Premium software / scientific laboratory hybrid.
-- Light editorial surfaces, dark scientific interfaces, oxide-red vessel accents and muted teal metadata.
-- Anatomically inspired vector vessel artwork in the hero.
-- Three application frontiers: vascular prognostics research, population-level digital twin research, and in silico endovascular innovation.
-- Five-step research workflow, deterministic waveform explorer, seven capability modules, evidence taxonomy and open-source installation.
-- Motion honours \`prefers-reduced-motion\`; primary narrative remains available as static HTML.
+## Source and regeneration
 
-## Scientific demonstration provenance
+Source archive: \`Cardioacoustics_ECs_v1.0.0.zip\`, SHA-256:
 
-Interactive chart A recreates the pressure and area waveforms defined in
-\`tests/mechanics/test_mechanics.py\`:
+\`\`\`
+2848af6d21765129ba66179734ee54a756e484c833de2af3c22143c437f693bb
+\`\`\`
 
-- time: 256 evenly spaced samples over [0, 1) s
-- pressure: P(t) = 100 + 20 sin(2πt) mmHg
-- luminal area: A(t) = 10⁻⁴[1 + 0.08 sin(2πt)] m² (displayed in mm²)
+Archive directories used:
 
-Interactive chart B recreates the pressure waveform and exact first harmonic amplitude from
-\`tests/spectral/test_spectral.py\`:
+- \`population/transfer_selected.npz\`
+- \`physiological_exposure/wp2_primary_exposure.npz\`
+- \`inputs/cohort/site_map.csv\`
+- \`study_manifest.json\`
 
-- P(t) = 10000 + 2000 sin(2πt) Pa
-- first harmonic amplitude: 2000 Pa
-- other non-DC harmonic amplitudes through n=8: 0 Pa for the defined analytical signal
+Regenerate the curated static JSON with NumPy:
 
-The explorer identifies these as **analytical reference signals** rather than population records. All figures and units are derived from documented test fixtures. Illustrative anatomy and device vectors are conceptual research artwork.
+\`\`\`sh
+python tools/site/build_cardioacoustics_dashboard.py \
+  Cardioacoustics_ECs_v1.0.0.zip site/assets/cardioacoustics-dashboard.json
+\`\`\`
+
+The uploaded source ZIP is not redistributed with the website. The curated \`site/assets/cardioacoustics-dashboard.json\` contains numerically derived cohort summaries and one virtual subject's 18 Hz phasor values. The raw archive records remain authoritative.
+
+Original PWDB source DOI: \`10.5281/zenodo.3275625\`. The archive is a separate frozen research package, version 1.0.0.
 
 ## Local preview
-
-From the repository root:
 
 \`\`\`sh
 python -m http.server 8000 --directory site
 \`\`\`
 
-Visit \`http://localhost:8000/\`. The installation CTA uses pip's supported direct Git URL to install the actual repository source.
+Open \`http://localhost:8000/\`.
 
-## Validation
+Run website smoke tests:
 
 \`\`\`sh
 node --check site/app.js
-python3 tests/site/check_site.py
+python tests/site/check_site.py
 \`\`\`
 
-The dedicated website-checks workflow runs these commands on relevant pull requests and on main. Deployment is handled by the existing \`.github/workflows/pages.yml\` once merged.
-
-## Design tokens
-
-All colour, spacing, component, desktop and mobile rules are in \`site/styles.css\`. The main page remains \`site/index.html\` and the scientific controls are in \`site/app.js\`. The site uses optional Google-hosted DM Sans and IBM Plex Mono fonts with system fallbacks.
-
-Keep scientific source labels and equations consistent with the test suite whenever examples are revised.
+The existing \`.github/workflows/pages.yml\` publishes \`site/\`. The \`site-checks.yml\` workflow validates syntax, scientific summary structure and provenance on relevant pull requests.
