@@ -43,7 +43,7 @@ From the repository root:
 python -m http.server 8000 --directory site
 \`\`\`
 
-Visit \`http://localhost:8000/\`.
+Visit \`http://localhost:8000/\`. The installation CTA uses pip's supported direct Git URL to install the actual repository source.
 
 ## Validation
 
