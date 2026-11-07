@@ -139,42 +139,121 @@
       </div>
     </section>
 
-    <section class="laboratory" id="laboratory" aria-labelledby="lab-title">
+    <section class="laboratory research-workstation" id="laboratory" aria-labelledby="lab-title">
       <div class="lab-orbit" aria-hidden="true"></div>
       <div class="container">
         <div class="lab-heading reveal">
-          <div><p class="kicker kicker-light">03 / INTERACTIVE SCIENTIFIC EXPLORER</p><h2 id="lab-title">See the science.<br><em>Interrogate the signal.</em></h2></div>
-          <p>Explore reproducible analytical reference signals used in the VascuQuest mechanics and spectral qualification tests. Inspect their shape, units and mathematical structure.</p>
-        </div>
-        <div class="lab-console reveal">
-          <div class="console-header"><span><i class="live-dot"></i> RESEARCH SIGNAL EXPLORER</span><span>REFERENCE / TEST FIXTURES <span class="console-index">VQ — 001</span></span></div>
-          <div class="console-body">
-            <div class="console-sidebar">
-              <div class="sidebar-label">SELECT AN EXPERIMENT</div>
-              <div class="mode-switch" role="group" aria-label="Scientific demonstration">
-                <button type="button" class="mode-button active" data-mode="mechanics" aria-pressed="true"><span>01</span> Pressure–area mechanics <b aria-hidden="true">↗</b></button>
-                <button type="button" class="mode-button" data-mode="spectral" aria-pressed="false"><span>02</span> Spectral reference <b aria-hidden="true">↗</b></button>
-              </div>
-              <div class="sidebar-rule"></div>
-              <div class="sidebar-label">DISPLAY QUANTITY</div>
-              <div class="quantity-switch" role="group" aria-label="Signal quantity">
-                <button type="button" class="quantity-button active" data-quantity="pressure" aria-pressed="true">Pressure</button>
-                <button type="button" class="quantity-button" data-quantity="area" aria-pressed="false">Area</button>
-              </div>
-              <div class="signal-metadata"><span>REFERENCE TYPE</span><strong id="signal-source">Manufactured mechanics test</strong><span>SAMPLE COUNT</span><strong>256 / PERIOD</strong><span>SCIENTIFIC IDENTITY</span><strong>ANALYTICAL REFERENCE</strong></div>
-            </div>
-            <div class="console-chart">
-              <div class="chart-header"><div><div class="micro micro-white" id="chart-category">PRESSURE–AREA MECHANICS</div><h3 id="chart-title">Arterial pressure waveform</h3></div><div class="chart-indicator"><span class="indicator-ring"></span> ANALYTICAL</div></div>
-              <div class="chart-stats"><div><small>REFERENCE VALUE</small><strong id="chart-mean">100.0 <small>mmHg</small></strong></div><div><small>AMPLITUDE</small><strong id="chart-amplitude">20.0 <small>mmHg</small></strong></div><div><small>PERIOD</small><strong>1.0 <small>s</small></strong></div></div>
-              <div class="chart-region"><svg id="lab-chart" role="img" aria-label="Analytical reference signal plotted across one second" viewBox="0 0 780 310" preserveAspectRatio="none"><g class="chart-gridlines"><path d="M55 35H754M55 95H754M55 155H754M55 215H754M55 275H754M55 35V275M230 35V275M405 35V275M580 35V275M754 35V275"/></g><g id="chart-y-labels"></g><path id="chart-area-path" class="plot-area" d=""/><path id="chart-line-path" class="plot-line" d="M55 155C135 48 220 48 295 155S475 262 555 155S675 48 754 155"/><g class="chart-ticks"><text x="55" y="303">0.0</text><text x="230" y="303">0.25</text><text x="405" y="303">0.50</text><text x="580" y="303">0.75</text><text x="754" y="303" text-anchor="end">1.00 s</text></g></svg></div>
-              <div class="chart-footer"><span id="chart-equation">P(t) = 100 + 20 sin(2πt) mmHg</span><a id="chart-source" href="https://github.com/KNOWDYN/VascuQuest/blob/main/tests/mechanics/test_mechanics.py" target="_blank" rel="noopener noreferrer">View qualification test ↗</a></div>
-            </div>
+          <div>
+            <p class="kicker kicker-light">03 / POPULATION CARDIOVASCULAR INTELLIGENCE</p>
+            <h2 id="lab-title">Explore the vascular system.<br><em>Interrogate every response.</em></h2>
           </div>
+          <p>A multi-site research workstation connecting cardioacoustic signatures, arterial wall mechanics and virtual cardiovascular states through an inspectable computational cohort.</p>
         </div>
-        <p class="lab-caption">Interactive visualisation of deterministic analytical signals from the VascuQuest test suite, retaining explicit mathematical definitions and units.</p>
+        <div class="research-console reveal" data-research-console data-source="assets/cardioacoustics-dashboard.json">
+          <header class="rc-top">
+            <div class="rc-top-left"><span class="rc-indicator"></span><div><strong>VascuQuest / Research Signal Explorer</strong><small>CARDIOVASCULAR COMPUTATIONAL WORKSTATION</small></div></div>
+            <div class="rc-top-right"><span class="rc-data-tag">ARCHIVED DATASET / V1.0.0</span><span class="rc-dataset-status" id="rc-status" role="status">LOADING DATA</span></div>
+          </header>
+          <div class="rc-metrics" aria-label="Study inventory">
+            <div><strong>102</strong><span>VIRTUAL SUBJECTS</span></div>
+            <div><strong>05</strong><span>ARTERIAL SITES</span></div>
+            <div><strong>03</strong><span>MODEL WALL STATES</span></div>
+            <div><strong>61</strong><span>FREQUENCY BINS / 10–40 HZ</span></div>
+            <div><strong>06</strong><span>AGE STRATA / 25–75 Y</span></div>
+          </div>
+          <div class="rc-grid">
+            <aside class="rc-arteries" aria-labelledby="rc-arteries-title">
+              <div class="rc-section-head"><span>01 / ANATOMICAL LOCATION</span><small>PWDB SITE MAP</small></div>
+              <div class="rc-artery-mark" aria-hidden="true">
+                <svg viewBox="0 0 170 220">
+                  <path d="M86 207V126C86 100 86 80 86 62M86 79C69 66 63 51 63 26M86 80C100 65 109 47 108 23M86 124C66 144 60 166 56 207M86 124C104 143 113 169 119 209" fill="none" stroke="#6b8c95" stroke-width="9" stroke-linecap="round"/>
+                  <path d="M86 207V126C86 100 86 80 86 62M86 79C69 66 63 51 63 26M86 80C100 65 109 47 108 23M86 124C66 144 60 166 56 207M86 124C104 143 113 169 119 209" fill="none" stroke="#c0d6db" stroke-opacity=".25" stroke-width="2" stroke-linecap="round"/>
+                  <circle cx="86" cy="79" r="6" fill="#d79a8a"/>
+                  <circle cx="108" cy="40" r="5" fill="#d79a8a"/>
+                  <circle cx="86" cy="124" r="6" fill="#d79a8a"/>
+                  <circle cx="56" cy="162" r="5" fill="#d79a8a"/>
+                  <circle cx="56" cy="207" r="5" fill="#d79a8a"/>
+                </svg>
+                <span>5-SITE ARTERIAL ATLAS</span>
+              </div>
+              <div class="rc-site-list" role="group" aria-label="Select arterial location">
+                <button type="button" class="rc-site active" data-site="left_common_carotid" aria-pressed="true"><span>15</span><strong>Left common carotid</strong><i>↗</i></button>
+                <button type="button" class="rc-site" data-site="proximal_aorta" aria-pressed="false"><span>01</span><strong>Proximal aorta</strong><i>↗</i></button>
+                <button type="button" class="rc-site" data-site="abdominal_aorta_iv" aria-pressed="false"><span>39</span><strong>Abdominal aorta IV</strong><i>↗</i></button>
+                <button type="button" class="rc-site" data-site="left_common_iliac" aria-pressed="false"><span>42</span><strong>Left common iliac</strong><i>↗</i></button>
+                <button type="button" class="rc-site" data-site="left_femoral_path" aria-pressed="false"><span>46</span><strong>Left femoral path</strong><i>↗</i></button>
+              </div>
+              <div class="rc-rail-foot"><span>LOCATION CONTEXT</span><p>Measured values shown are computational cohort outputs mapped to the named arterial segment.</p></div>
+            </aside>
+            <div class="rc-centre">
+              <div class="rc-plot-head">
+                <div><span class="rc-eyebrow">02 / FREQUENCY RESPONSE COMPARISON</span><h3 id="rc-location">Left common carotid</h3><span class="rc-location-detail" id="rc-location-detail">Segment 15 · 102 virtual subjects</span></div>
+                <div class="rc-exposure-tag"><span class="rc-status-pulse"></span> MODEL-BASED COHORT <strong>102 / 102</strong></div>
+              </div>
+              <div class="rc-channel-selector" role="group" aria-label="Select signal channel">
+                <button type="button" data-channel="gain" class="active" aria-pressed="true">Pressure <small>gain · dB</small></button>
+                <button type="button" data-channel="traction" aria-pressed="false">Endothelial traction <small>mPa/Pa</small></button>
+                <button type="button" data-channel="motion" aria-pressed="false">Wall displacement <small>nm/Pa</small></button>
+              </div>
+              <div class="rc-chart-shell">
+                <div class="rc-chart-heading"><span id="rc-chart-heading">Median pressure transfer gain</span><span id="rc-chart-unit">GAIN / dB</span></div>
+                <div class="rc-chart-view">
+                  <svg id="rc-spectrum" viewBox="0 0 760 308" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Pressure transfer spectra for healthy, partially stiffened and stiffened virtual artery states">
+                    <g id="rc-spectrum-grid"></g><g id="rc-spectrum-series"></g><g id="rc-spectrum-markers"></g><g id="rc-spectrum-axes"></g>
+                  </svg>
+                  <div id="rc-plot-tooltip" class="rc-plot-tooltip" aria-hidden="true"></div>
+                </div>
+                <div class="rc-plot-legend" role="group" aria-label="Select foreground wall state">
+                  <button type="button" data-state="healthy" class="active" aria-pressed="true"><span class="rc-swatch healthy"></span> Healthy elastic</button>
+                  <button type="button" data-state="partial" aria-pressed="false"><span class="rc-swatch partial"></span> Partially stiffened</button>
+                  <button type="button" data-state="stiff" aria-pressed="false"><span class="rc-swatch stiff"></span> Stiffened arterial wall</button>
+                </div>
+                <p class="rc-plot-caption">Median transfer magnitude across the 102-subject virtual cohort. Three vascular states overlaid; 21 plotted frequency samples from the archived 61-bin transfer grid.</p>
+              </div>
+              <div class="rc-lower-grid">
+                <article class="rc-subpanel rc-harmonic">
+                  <div class="rc-subpanel-top"><div><span class="rc-eyebrow">03 / EVENT EXPOSURE</span><h4>Cardioacoustic pressure component</h4></div><strong>WP2 / A2 · 18 Hz</strong></div>
+                  <svg id="rc-phasor" viewBox="0 0 440 160" preserveAspectRatio="xMidYMid meet" role="img" aria-label="18 Hz pressure phasor reconstructed over one cardiac-acoustic observation window"><g class="rc-phasor-grid"><path d="M44 20H424M44 62H424M44 104H424M44 142H424M44 20V142M139 20V142M234 20V142M329 20V142M424 20V142"/></g><g id="rc-phasor-series"></g><g id="rc-phasor-labels"></g></svg>
+                  <p>18 Hz single-frequency reconstruction from archived complex pressure phasors · reference virtual subject <strong>#1048</strong>.</p>
+                </article>
+                <article class="rc-subpanel rc-pwv">
+                  <div class="rc-subpanel-top"><div><span class="rc-eyebrow">04 / COHORT MECHANICS</span><h4>Carotid–femoral pulse wave velocity</h4></div><strong>m/s</strong></div>
+                  <svg id="rc-pwv" viewBox="0 0 440 160" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Cohort median carotid-femoral pulse wave velocity by six age strata for three vascular wall states"><g id="rc-pwv-bars"></g></svg>
+                  <p>Designed virtual cohort · six age strata · medians by vascular state.</p>
+                </article>
+              </div>
+              <div class="rc-matrix-panel">
+                <div class="rc-subpanel-top"><div><span class="rc-eyebrow">05 / CROSS-ARTERY COMPARISON</span><h4>WP2/A2 arterial exposure matrix</h4></div><strong>18 Hz · Pa</strong></div>
+                <div class="rc-matrix-scroll"><table class="rc-heatmap"><caption class="sr-only">Median absolute 18 Hz pressure phasor amplitude in pascals, by artery and vascular wall state</caption><thead><tr><th scope="col">ARTERIAL SITE</th><th scope="col">HEALTHY</th><th scope="col">PARTIAL</th><th scope="col">STIFF</th></tr></thead><tbody id="rc-matrix-body"></tbody></table></div>
+                <p class="rc-plot-caption">Median absolute pressure phasor response to the archived 310 Pa root event. Select a site or a state to examine its spectral and mechanical signature.</p>
+              </div>
+            </div>
+            <aside class="rc-inspector" aria-labelledby="rc-inspector-title">
+              <div class="rc-section-head"><span id="rc-inspector-title">06 / EXPOSURE INSPECTOR</span><small>18 Hz</small></div>
+              <div class="rc-inspector-header"><span id="rc-selected-location">LEFT COMMON CAROTID</span><strong id="rc-selected-state">HEALTHY ELASTIC</strong></div>
+              <div class="rc-reading rc-reading-primary"><span>PRESSURE PHASOR / MEDIAN</span><strong id="rc-pressure">240.6 <small>Pa</small></strong></div>
+              <div class="rc-reading"><span>ENDOTHELIAL TRACTION</span><strong id="rc-traction">0.420 <small>Pa</small></strong></div>
+              <div class="rc-reading"><span>RADIAL DISPLACEMENT</span><strong id="rc-displacement">8.71 <small>µm</small></strong></div>
+              <div class="rc-reading"><span>WALL ACCELERATION</span><strong id="rc-acceleration">0.111 <small>m/s²</small></strong></div>
+              <div class="rc-reading"><span>TRACTION GRADIENT</span><strong id="rc-gradient">47.5 <small>Pa/s</small></strong></div>
+              <div class="rc-model-library">
+                <div class="rc-section-head"><span>07 / VIRTUAL DISEASE LIBRARY</span><small>4 PRESETS</small></div>
+                <p>Mechanistic research pathways available across the broader VascuQuest platform.</p>
+                <a href="https://github.com/KNOWDYN/VascuQuest/blob/main/docs/VIRTUAL_DISEASE.md" target="_blank" rel="noopener noreferrer"><span>01</span><strong>Carotid stenosis</strong><i>↗</i></a>
+                <a href="https://github.com/KNOWDYN/VascuQuest/blob/main/docs/VIRTUAL_DISEASE.md" target="_blank" rel="noopener noreferrer"><span>02</span><strong>Iliac stenosis</strong><i>↗</i></a>
+                <a href="https://github.com/KNOWDYN/VascuQuest/blob/main/docs/VIRTUAL_DISEASE.md" target="_blank" rel="noopener noreferrer"><span>03</span><strong>Abdominal aortic aneurysm</strong><i>↗</i></a>
+                <a href="https://github.com/KNOWDYN/VascuQuest/blob/main/docs/VIRTUAL_DISEASE.md" target="_blank" rel="noopener noreferrer"><span>04</span><strong>Arterial stiffening</strong><i>↗</i></a>
+              </div>
+            </aside>
+          </div>
+          <footer class="rc-foot">
+            <div><span class="rc-foot-dot"></span><strong>DATASET PROVENANCE</strong> <span>Cardioacoustics_ECs_v1.0.0 · PWDB 3275625 · population and exposure arrays</span></div>
+            <a href="assets/cardioacoustics-dashboard.json" target="_blank" rel="noopener noreferrer">Inspect dashboard data ↗</a>
+          </footer>
+        </div>
+        <p class="lab-caption">The dashboard presents archived modelled cardioacoustic outputs and research population statistics. Disease-model links reference the wider VascuQuest research platform.</p>
       </div>
     </section>
-
     <section class="capabilities section-light" id="capabilities" aria-labelledby="capabilities-title">
       <div class="container">
         <div class="section-heading reveal"><div><p class="kicker">04 / SCIENTIFIC CAPABILITIES</p><h2 id="capabilities-title">One platform.<br><em>Multiple dimensions.</em></h2></div><p class="section-sidecopy">A coherent computational research toolkit spanning vascular populations, mechanics, exact kinematic reconstruction, spectral analysis and statistical evidence.</p></div>
