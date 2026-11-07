@@ -45,6 +45,9 @@ assert page.buttons >= 5, "Expected interactive explorer and navigation controls
 assert all(v and v != "#" for v in page.links), "Found empty navigation link"
 assert all((SITE / p).is_file() for p in page.local_files), "Missing a local site asset"
 assert "https://knowdyn.github.io/VascuQuest/" in INDEX, "Incorrect Pages canonical address"
+assert "The future of endovascular research," in INDEX, "New hero heading missing"
+assert "assets/stroke-intervention.svg" in INDEX, "Endovascular hero artwork missing"
+assert (SITE / "assets" / "stroke-intervention.svg").is_file(), "Stroke intervention SVG missing"
 assert all(x in INDEX for x in ("HEMOSPACE", "Virtual Disease", "Exact Kinematics", "INFERRED", "MODELLED"))
 assert "prefers-reduced-motion" in JS and "prefers-reduced-motion" in CSS
 assert "aria-pressed" in JS and "aria-expanded" in JS

@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 660 700" role="img" aria-labelledby="stroke-title stroke-desc">
+<title id="stroke-title">Endovascular stroke intervention — cerebral angiography illustration</title>
+<desc id="stroke-desc">An angiography-inspired anteroposterior view of the internal carotid artery giving rise to the anterior cerebral and middle cerebral arteries. A focal proximal M1 occlusion is highlighted while a microcatheter approaches through the carotid siphon. Illustration, not patient imaging.</desc>
+<defs>
+  <radialGradient id="screen" cx="49%" cy="37%" r="72%"><stop stop-color="#243944"/><stop offset=".58" stop-color="#111e28"/><stop offset="1" stop-color="#09141c"/></radialGradient>
+  <linearGradient id="arterial" x1="0" y1="1" x2=".8" y2="0"><stop stop-color="#d5e3e6" stop-opacity=".7"/><stop offset=".58" stop-color="#f0f4f2" stop-opacity=".95"/><stop offset="1" stop-color="#bed4d8" stop-opacity=".9"/></linearGradient>
+  <linearGradient id="cath" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#8cafb7"/><stop offset=".75" stop-color="#f5c4ad"/><stop offset="1" stop-color="#f4e1cf"/></linearGradient>
+  <filter id="bloom"><feGaussianBlur stdDeviation="3"/></filter>
+  <path id="ica" d="M 314 668 C 315 607 297 559 306 517 C 316 475 349 460 341 424 C 337 401 307 397 302 370 C 295 344 315 323 345 320 C 373 317 382 296 371 269"/>
+  <path id="m1" d="M371 269 C393 262 419 251 443 248"/>
+  <path id="aca" d="M371 269 C350 253 335 240 334 213 C334 182 344 161 342 132 C341 111 336 91 327 70"/>
+  <path id="proximalContrast" d="M314 668 C315 607 297 559 306 517 C316 475 349 460 341 424 C337 401 307 397 302 370 C295 344 315 323 345 320 C373 317 382 296 371 269 C393 262 419 251 443 248"/>
+  <path id="navigationPath" d="M319 663 C319 606 302 557 311 517 C321 476 355 462 346 422 C342 398 313 398 309 371 C303 347 321 330 349 326 C379 321 385 301 374 275 C394 266 417 258 435 253"/>
+</defs>
+<style>
+  .datum{stroke:#83a4b0;stroke-opacity:.12;stroke-width:1}
+  .skull{stroke:#a6bfc5;stroke-opacity:.14;fill:none;stroke-width:2.5}
+  .vessel{stroke:url(#arterial);fill:none;stroke-linejoin:round;stroke-linecap:round}
+  .major{stroke-width:10}.middle{stroke-width:6.5}.fine{stroke-width:4}
+  .distal{stroke:#9aadb7;stroke-opacity:.32;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .anno{font:11px ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:1.4px;fill:#c0d0d4}
+  .dim{fill:#8fa8b0}.line{stroke:#95b0b8;stroke-width:1;stroke-opacity:.66;fill:none}
+  .contrast{fill:none;stroke:#edfaf8;stroke-width:11;stroke-linecap:round;stroke-dasharray:70 900;animation:inject 5.4s ease-in-out infinite}
+  .catheter{fill:none;stroke:url(#cath);stroke-width:4.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:100;stroke-dashoffset:100;animation:advance 7.5s cubic-bezier(.45,0,.25,1) infinite}
+  .catheter-rest{fill:none;stroke:#a6bfc9;stroke-opacity:.2;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+  .clot-ring{fill:none;stroke:#e7a397;stroke-width:1.3;stroke-dasharray:4 6;transform-origin:445px 248px;animation:ring 9s linear infinite}
+  .clot-halo{fill:#bd515f;fill-opacity:.12;stroke:#e7a397;stroke-opacity:.7;stroke-width:1.7;transform-origin:445px 248px;animation:beat 2.5s ease-in-out infinite}
+  .flow-glow{stroke:#dbeff0;stroke-opacity:.18;stroke-width:14;fill:none;filter:url(#bloom)}
+  .scan{fill:#95bdc3;opacity:.10;animation:scan 9s linear infinite}
+  .clinical{font:10px ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:1.5px;fill:#aac1c8}
+  @keyframes inject{0%,5%{stroke-dashoffset:1000;opacity:0}12%{opacity:.8}65%{stroke-dashoffset:0;opacity:.75}82%,100%{stroke-dashoffset:-100;opacity:0}}
+  @keyframes advance{0%,8%{stroke-dashoffset:100}62%,84%{stroke-dashoffset:0}100%{stroke-dashoffset:100}}
+  @keyframes ring{to{transform:rotate(360deg)}}
+  @keyframes beat{0%,100%{transform:scale(1);opacity:.75}50%{transform:scale(1.12);opacity:1}}
+  @keyframes scan{0%{transform:translateY(-660px)}100%{transform:translateY(700px)}}
+  @media(prefers-reduced-motion:reduce){.contrast,.catheter,.clot-ring,.clot-halo,.scan{animation:none}.catheter{stroke-dashoffset:0}.contrast{display:none}}
+</style>
+<rect width="660" height="700" fill="url(#screen)"/>
+<g class="datum"><path d="M80 0V700M180 0V700M280 0V700M380 0V700M480 0V700M580 0V700M0 90H660M0 190H660M0 290H660M0 390H660M0 490H660M0 590H660"/></g>
+<rect class="scan" x="0" y="0" width="660" height="4"/>
+<g class="skull">
+  <path d="M155 328C140 225 160 127 229 81C281 44 382 41 444 80C523 131 541 230 522 334C510 407 483 462 437 501"/>
+  <path d="M173 333C169 211 216 113 292 95M494 325C502 214 461 119 391 92"/>
+  <path d="M201 326C205 382 240 421 262 448M478 338C476 389 450 424 422 447"/>
+  <path d="M257 475C280 488 313 493 334 490C359 488 384 480 402 468"/>
+  <path d="M279 491C271 527 267 555 276 588M378 490C390 536 387 563 379 589"/>
+</g>
+<!-- Distal MCA branches: attenuated beyond the illustrated M1 obstruction. -->
+<g class="distal" stroke-width="5">
+  <path d="M455 249C482 242 505 224 515 199C527 172 537 153 555 139"/>
+  <path d="M480 235C496 212 499 190 492 167C486 147 476 134 459 120"/>
+  <path d="M515 199C543 197 562 186 582 161"/>
+  <path d="M470 246C495 256 519 272 528 297C539 322 552 333 575 345"/>
+  <path d="M525 290C546 273 567 267 589 270"/>
+  <path d="M542 314C559 309 578 312 596 322"/>
+</g>
+<g class="vessel">
+  <use xlink:href="#ica" class="major"/>
+  <use xlink:href="#m1" class="major"/>
+  <use xlink:href="#aca" class="middle"/>
+  <path class="fine" d="M335 204C310 185 297 160 299 130C300 105 311 90 323 74"/>
+  <path class="fine" d="M343 139C368 120 376 104 379 80"/>
+  <path class="fine" d="M369 270C358 250 345 239 322 237C299 234 282 228 267 213"/>
+  <path class="fine" d="M330 332C300 322 280 315 264 294C253 280 243 265 225 255"/>
+  <path class="fine" d="M340 422C372 433 386 455 395 480"/>
+  <path class="fine" d="M300 371C283 382 261 389 244 384"/>
+  <path class="fine" d="M332 214C312 207 298 204 282 195"/>
+</g>
+<!-- Contrast stops at the blockage and advances only through the patent proximal route. -->
+<use xlink:href="#proximalContrast" class="flow-glow"/>
+<use xlink:href="#proximalContrast" class="contrast"/>
+<!-- Catheter runs from the cervical ICA, through the siphon and into the proximal M1. -->
+<use xlink:href="#navigationPath" class="catheter-rest"/>
+<path class="catheter" d="M319 663 C319 606 302 557 311 517 C321 476 355 462 346 422 C342 398 313 398 309 371 C303 347 321 330 349 326 C379 321 385 301 374 275 C394 266 417 258 435 253" pathLength="100"/>
+<!-- Focal M1 occlusion. -->
+<circle cx="445" cy="248" r="31" class="clot-ring"/>
+<circle cx="445" cy="248" r="18" class="clot-halo"/>
+<path d="M438 243Q444 236 452 241Q458 249 452 256Q445 262 437 254Q432 249 438 243Z" fill="#bc6570" stroke="#f0b9aa" stroke-width="1.4"/>
+<g class="line">
+  <path d="M459 244L503 206H584"/>
+  <path d="M326 488L232 521H106"/>
+  <path d="M334 170L262 139H195"/>
+  <path d="M483 259L526 302H599"/>
+</g>
+<g class="anno">
+  <text x="506" y="193" fill="#f0b9aa">M1 / OCCLUSION</text>
+  <text x="104" y="513">ICA ACCESS</text>
+  <text x="139" y="132">ACA / A2</text>
+  <text x="529" y="315">MCA TERRITORY</text>
+</g>
+<g class="clinical">
+  <text x="48" y="50">DSA-INSPIRED NEUROVASCULAR VIEW</text>
+  <text x="48" y="68" class="dim">ANTERIOR CIRCULATION  •  AP PROJECTION</text>
+  <text x="46" y="646" class="dim">MICROCATHETER APPROACH / M1</text>
+  <text x="615" y="646" text-anchor="end">VQ / 001</text>
+</g>
+<path d="M47 86V104H68M613 86V104H593M47 616V598H68M613 616V598H593" fill="none" stroke="#8eacb4" stroke-width="1.5" stroke-opacity=".6"/>
+</svg>
