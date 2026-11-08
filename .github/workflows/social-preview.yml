@@ -1,0 +1,48 @@
+name: Render VascuQuest social preview
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/assets/social-preview-source.svg"
+      - ".github/workflows/social-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Install SVG renderer
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes librsvg2-bin
+      - name: Render the exact 1200x630 Open Graph PNG
+        run: |
+          rsvg-convert -w 1200 -h 630 \
+            -o site/assets/social-preview.png \
+            site/assets/social-preview-source.svg
+          python3 - <<'PY'
+          from pathlib import Path
+          from struct import unpack
+          p=Path("site/assets/social-preview.png")
+          data=p.read_bytes()
+          assert data[:8]==bytes.fromhex("89504e470d0a1a0a")
+          assert unpack(">II",data[16:24])==(1200,630)
+          assert len(data)>30000
+          print("Verified 1200x630 PNG",len(data),"bytes")
+          PY
+      - name: Publish refreshed social preview
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/assets/social-preview.png
+          if ! git diff --cached --quiet; then
+            git commit -m "Regenerate VascuQuest social sharing image"
+            git push origin HEAD:main
+          fi
